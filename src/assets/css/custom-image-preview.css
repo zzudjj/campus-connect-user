@@ -1,0 +1,22 @@
+/* u81eau5b9au4e49u56feu7247u9884u89c8u6837u5f0f */
+.custom-image-preview {
+  --el-image-viewer-mask-color: rgba(0, 0, 0, 0.8);
+}
+
+.custom-image-preview .el-image-viewer__img {
+  max-width: 80vw !important; /* u9650u5236u56feu7247u6700u5927u5bbdu5ea6u4e3au89c6u53e3u5bbdu5ea6u768480% */
+  max-height: 80vh !important; /* u9650u5236u56feu7247u6700u5927u9ad8u5ea6u4e3au89c6u53e3u9ad8u5ea6u768480% */
+  object-fit: contain;
+}
+
+.custom-image-preview .el-image-viewer__close {
+  font-size: 32px;
+  color: #fff;
+  opacity: 0.8;
+  top: 20px;
+  right: 20px;
+}
+
+.custom-image-preview .el-image-viewer__actions {
+  opacity: 0.8;
+}

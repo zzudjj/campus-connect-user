@@ -1,0 +1,30 @@
+/* 模态框全局样式覆盖 */
+.el-overlay {
+  z-index: 2500 !important;
+  background-color: rgba(0, 0, 0, 0.65) !important;
+}
+
+.el-overlay-dialog {
+  z-index: 3000 !important;
+}
+
+.el-dialog {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.el-dialog__header {
+  padding: 20px 24px 10px;
+  margin: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.el-dialog__body {
+  padding: 16px 24px;
+}
+
+.el-dialog__headerbtn {
+  top: 18px;
+  right: 20px;
+}

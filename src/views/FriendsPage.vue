@@ -1,0 +1,1124 @@
+<template>
+  <div class="friends-page">
+    <HeaderBar :center-search="false" class="friends-header" />
+    <div class="override-container">
+      <el-card class="main-card" shadow="hover">
+        <div class="card-header">
+          <h2 class="page-title">好友</h2>
+        </div>
+        
+        <el-tabs v-model="activeTab" @tab-click="handleTabClick" class="friends-tabs">
+          <!-- 好友列表标签页 -->
+          <el-tab-pane label="好友列表" name="friendsList">
+            <div v-if="loadingFriends" class="loading-container">
+              <div class="loading-spinner">
+                <div class="spinner-circle"></div>
+              </div>
+              <div class="loading-text">加载中...</div>
+            </div>
+            
+            <div v-else-if="friends.length === 0" class="empty-state">
+              <el-empty description="暂无好友" />
+              <el-button type="primary" @click="activeTab = 'allUsers'">去添加好友</el-button>
+            </div>
+            
+            <div v-else class="masonry-container">
+              <FriendCard 
+                v-for="friend in friends" 
+                :key="friend.friendshipId" 
+                :friend="friend"
+              >
+                <template #actions>
+                  <el-button size="small" @click="router.push(`/user/${friend.otherUserId}`)">查看</el-button>
+                  <el-button size="small" type="danger" @click="confirmDeleteFriend(friend)">删除</el-button>
+                </template>
+              </FriendCard>
+            </div>
+          </el-tab-pane>
+          
+          <!-- 收到的好友请求标签页 -->
+          <el-tab-pane :label="'收到的请求' + (pendingRequestCount > 0 ? `(${pendingRequestCount})` : '')" name="receivedRequests">
+            <div v-if="loadingReceived" class="loading-container">
+              <div class="loading-spinner">
+                <div class="spinner-circle"></div>
+              </div>
+              <div class="loading-text">加载中...</div>
+            </div>
+            
+            <div v-else-if="receivedRequests.length === 0" class="empty-state">
+              <el-empty description="暂无收到的好友请求" />
+            </div>
+            
+            <div v-else class="masonry-container">
+              <RequestCard
+                v-for="request in receivedRequests"
+                :key="request.requestId"
+                :request="request"
+                :is-received="true"
+                @accept="acceptRequest"
+                @reject="rejectRequest"
+              />
+            </div>
+          </el-tab-pane>
+          
+          <!-- 发送的好友请求标签页 -->
+          <el-tab-pane label="发送的请求" name="sentRequests">
+            <div v-if="loadingSent" class="loading-container">
+              <div class="loading-spinner">
+                <div class="spinner-circle"></div>
+              </div>
+              <div class="loading-text">加载中...</div>
+            </div>
+            
+            <div v-else-if="sentRequests.length === 0" class="empty-state">
+              <el-empty description="暂无发送的好友请求" />
+              <el-button type="primary" @click="activeTab = 'allUsers'">去添加好友</el-button>
+            </div>
+            
+            <div v-else class="masonry-container">
+              <RequestCard
+                v-for="request in sentRequests"
+                :key="request.requestId"
+                :request="request"
+                :is-received="false"
+              />
+            </div>
+          </el-tab-pane>
+          
+          <!-- 全部用户标签页 -->
+          <el-tab-pane label="全部用户" name="allUsers">
+            <div class="search-container">
+              <div class="search-box">
+                <el-input
+                  v-model="searchQuery"
+                  placeholder="搜索用户..."
+                  clearable
+                  @input="handleSearch"
+                >
+                  <template #prefix>
+                    <el-icon><i-ep-search /></el-icon>
+                  </template>
+                </el-input>
+              </div>
+            </div>
+            
+            <div v-if="loadingUsers" class="loading-container">
+              <div class="loading-spinner">
+                <div class="spinner-circle"></div>
+              </div>
+              <div class="loading-text">加载中...</div>
+            </div>
+            
+            <div v-else-if="filteredUsers.length === 0" class="empty-state">
+              <el-empty description="没有找到匹配的用户" />
+            </div>
+            
+            <div v-else class="masonry-container">
+              <UserCard
+                v-for="user in filteredUsers"
+                :key="user.id"
+                :user="user"
+                @add-friend="showAddFriendDialog"
+                @view-profile="viewUserProfile"
+              />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+        
+        <!-- 删除好友确认对话框 -->
+        <el-dialog
+          v-model="deleteDialogVisible"
+          title="删除好友"
+          width="30%"
+        >
+          <span>确定要删除好友 "{{ currentFriend?.nickname || '' }}" 吗？</span>
+          <template #footer>
+            <span class="dialog-footer">
+              <el-button @click="deleteDialogVisible = false">取消</el-button>
+              <el-button type="danger" @click="deleteFriend">确认删除</el-button>
+            </span>
+          </template>
+        </el-dialog>
+        
+        <!-- 添加好友对话框 -->
+        <el-dialog
+          v-model="addFriendDialogVisible"
+          title="添加好友"
+          width="30%"
+          append-to-body
+          :modal-append-to-body="true"
+          :lock-scroll="true"
+          :close-on-click-modal="false"
+          :show-close="true"
+          destroy-on-close
+          custom-class="friend-dialog"
+        >
+          <div v-if="currentUser" class="add-friend-content">
+            <p class="dialog-user-name">发送好友请求给 {{ currentUser.nickname || `用户${currentUser.id}` }}</p>
+            <el-input
+              v-model="requestMessage"
+              type="textarea"
+              :rows="3"
+              placeholder="添加验证消息（选填）"
+              maxlength="100"
+              show-word-limit
+              class="message-input"
+            />
+          </div>
+          <template #footer>
+            <div class="dialog-footer">
+              <el-button @click="cancelAddFriend">取消</el-button>
+              <el-button type="primary" @click="sendFriendRequest">发送请求</el-button>
+            </div>
+          </template>
+        </el-dialog>
+      </el-card>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import HeaderBar from '../components/layout/HeaderBar.vue';
+import FriendCard from '../components/friend/FriendCard.vue';
+import UserCard from '../components/friend/UserCard.vue';
+import RequestCard from '../components/friend/RequestCard.vue';
+
+// 导入API
+import { 
+  getFriendsList, 
+  deleteFriend as apiDeleteFriend, 
+  getReceivedRequests, 
+  getSentRequests, 
+  getPendingRequestCount, 
+  acceptFriendRequest, 
+  rejectFriendRequest, 
+  checkFriendStatus, 
+  sendFriendRequest as apiSendFriendRequest 
+} from '../api/friend.js';
+import { getAllUsers } from '../api/user.js';
+
+const router = useRouter();
+
+// 标签页状态
+const activeTab = ref('friendsList');
+
+// 好友列表相关
+const friends = ref([]);
+const loadingFriends = ref(true);
+const deleteDialogVisible = ref(false);
+const currentFriend = ref(null);
+
+// 好友请求相关
+const receivedRequests = ref([]);
+const sentRequests = ref([]);
+const loadingReceived = ref(true);
+const loadingSent = ref(true);
+const pendingRequestCount = ref(0);
+
+// 全部用户相关
+const users = ref([]);
+const loadingUsers = ref(true);
+const searchQuery = ref('');
+const addFriendDialogVisible = ref(false);
+const currentUser = ref(null);
+const requestMessage = ref('');
+
+// 定时器ID
+let countTimer = null;
+
+// 获取好友列表
+const fetchFriends = async () => {
+  loadingFriends.value = true;
+  try {
+    const data = await getFriendsList();
+    if (data.code === 200) {
+      friends.value = data.data || [];
+    } else {
+      ElMessage.error(data.message || '获取好友列表失败');
+    }
+  } catch (error) {
+    console.error('获取好友列表失败', error);
+    ElMessage.error('获取好友列表失败，请检查网络连接');
+  } finally {
+    loadingFriends.value = false;
+  }
+};
+
+// 删除好友确认
+const confirmDeleteFriend = (friend) => {
+  currentFriend.value = friend;
+  deleteDialogVisible.value = true;
+};
+
+// 删除好友
+const deleteFriend = async () => {
+  if (!currentFriend.value) return;
+  
+  try {
+    const data = await apiDeleteFriend(currentFriend.value.otherUserId);
+    if (data.code === 200) {
+      ElMessage.success('好友删除成功');
+      // 从列表中移除该好友
+      friends.value = friends.value.filter(f => f.friendshipId !== currentFriend.value.friendshipId);
+      deleteDialogVisible.value = false;
+      
+      // 如果当前是在用户标签页，也需要更新用户的好友状态
+      if (users.value.length > 0) {
+        const userIndex = users.value.findIndex(u => u.id === currentFriend.value.otherUserId);
+        if (userIndex !== -1) {
+          users.value[userIndex].friendStatus = 'none';
+        }
+      }
+    } else {
+      ElMessage.error(data.message || '删除好友失败');
+    }
+  } catch (error) {
+    console.error('删除好友失败', error);
+    ElMessage.error('删除好友失败，请检查网络连接');
+  }
+};
+
+// 获取收到的好友请求
+const fetchReceivedRequests = async () => {
+  loadingReceived.value = true;
+  try {
+    const data = await getReceivedRequests();
+    if (data.code === 200) {
+      receivedRequests.value = data.data || [];
+      // 更新待处理请求数量
+      pendingRequestCount.value = receivedRequests.value.filter(req => req.status === 0).length;
+    } else {
+      ElMessage.error(data.message || '获取收到的好友请求失败');
+    }
+  } catch (error) {
+    console.error('获取收到的好友请求失败', error);
+    ElMessage.error('获取收到的好友请求失败，请检查网络连接');
+  } finally {
+    loadingReceived.value = false;
+  }
+};
+
+// 获取发送的好友请求
+const fetchSentRequests = async () => {
+  loadingSent.value = true;
+  try {
+    const data = await getSentRequests();
+    if (data.code === 200) {
+      sentRequests.value = data.data || [];
+    } else {
+      ElMessage.error(data.message || '获取发送的好友请求失败');
+    }
+  } catch (error) {
+    console.error('获取发送的好友请求失败', error);
+    ElMessage.error('获取发送的好友请求失败，请检查网络连接');
+  } finally {
+    loadingSent.value = false;
+  }
+};
+
+// 获取待处理的好友请求数量
+const fetchPendingRequestCount = async () => {
+  try {
+    const data = await getPendingRequestCount();
+    if (data.code === 200) {
+      pendingRequestCount.value = data.data;
+    }
+  } catch (error) {
+    console.error('获取待处理好友请求数量失败', error);
+  }
+};
+
+// 接受好友请求
+const acceptRequest = async (request) => {
+  try {
+    const data = await acceptFriendRequest(request.requestId);
+    if (data.code === 200) {
+      ElMessage.success('已接受好友请求');
+      // 从收到的请求列表中移除
+      receivedRequests.value = receivedRequests.value.filter(req => req.requestId !== request.requestId);
+      // 更新待处理请求数量
+      pendingRequestCount.value = Math.max(0, pendingRequestCount.value - 1);
+      // 刷新好友列表
+      fetchFriends();
+    } else {
+      ElMessage.error(data.message || '接受好友请求失败');
+    }
+  } catch (error) {
+    console.error('接受好友请求失败', error);
+    ElMessage.error('接受好友请求失败，请检查网络连接');
+  }
+};
+
+// 拒绝好友请求
+const rejectRequest = async (request) => {
+  try {
+    const data = await rejectFriendRequest(request.requestId);
+    if (data.code === 200) {
+      ElMessage.success('已拒绝好友请求');
+      // 从收到的请求列表中移除
+      receivedRequests.value = receivedRequests.value.filter(req => req.requestId !== request.requestId);
+      // 更新待处理请求数量
+      pendingRequestCount.value = Math.max(0, pendingRequestCount.value - 1);
+    } else {
+      ElMessage.error(data.message || '拒绝好友请求失败');
+    }
+  } catch (error) {
+    console.error('拒绝好友请求失败', error);
+    ElMessage.error('拒绝好友请求失败，请检查网络连接');
+  }
+};
+
+// 获取所有用户
+// 检查登录状态的辅助函数
+const checkLoginStatus = () => {
+  console.group('当前登录状态详情');
+  // 打印所有localStorage内容供调试
+  console.log('全部localStorage内容:');
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const value = localStorage.getItem(key);
+    console.log(`${key}: ${value}`);
+  }
+  const token = localStorage.getItem('token');
+  const userId = localStorage.getItem('userId');
+  const nickname = localStorage.getItem('nickname');
+  console.log('登录状态检查:', { 
+    token: token ? '存在' : '不存在', 
+    userId, 
+    nickname,
+    userAgent: navigator.userAgent
+  });
+  console.groupEnd();
+  return { token, userId, nickname };
+};
+
+const fetchUsers = async () => {
+  loadingUsers.value = true;
+  try {
+    // 在获取用户列表前检查登录状态
+    const loginStatus = checkLoginStatus();
+    
+    const data = await getAllUsers();
+    if (data.code === 200) {
+      console.group('过滤用户列表');
+      // 获取原始数据信息
+      console.log('原始用户数据总数:', data.data.length);
+      console.log('浏览器类型:', navigator.userAgent.indexOf('Edg') > -1 ? 'Edge' : 'Chrome/其他');
+      
+      // 获取当前用户ID值 - 从 userInfo 对象中提取
+      let currentUserId = null;
+      try {
+        // 先尝试直接获取 userId
+        currentUserId = localStorage.getItem('userId');
+        
+        // 如果不存在，尝试从 userInfo 对象中获取
+        if (!currentUserId) {
+          const userInfoStr = localStorage.getItem('userInfo');
+          if (userInfoStr) {
+            const userInfo = JSON.parse(userInfoStr);
+            if (userInfo && userInfo.userId) {
+              currentUserId = userInfo.userId.toString();
+              console.log('从 userInfo 中提取到 userId:', currentUserId);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('提取用户ID时出错:', error);
+      }
+      
+      console.log('最终的当前用户ID值:', currentUserId, '类型:', typeof currentUserId);
+      
+      // 改进过滤逻辑，处理跨浏览器问题
+      let filteredList = [];
+      
+      // 检查是否在Edge浏览器中运行
+      const isEdgeBrowser = navigator.userAgent.indexOf('Edg') > -1;
+      
+      if (isEdgeBrowser) {
+        // Edge浏览器中特殊处理
+        console.log('Edge浏览器特殊处理');
+        // 仅当userId类型为string时才过滤，否则显示全部
+        if (currentUserId && typeof currentUserId === 'string' && currentUserId.trim() !== '') {
+          console.log('在Edge中有效的userId，进行过滤');
+          filteredList = data.data.filter(user => {
+            if (!user.userId) return true;
+            return String(user.userId) !== String(currentUserId);
+          });
+        } else {
+          console.log('Edge中无效userId，显示全部用户');
+          filteredList = data.data;
+        }
+      } else {
+        // Chrome和其他浏览器中的处理
+        console.log('Chrome/其他浏览器处理');
+        if (currentUserId && typeof currentUserId === 'string' && currentUserId.trim() !== '') {
+          console.log('其他浏览器有效userId，进行过滤');
+          filteredList = data.data.filter(user => {
+            if (!user.userId) return true;
+            const userId = String(user.userId);
+            const currId = String(currentUserId);
+            const shouldExclude = userId === currId;
+            if (shouldExclude) {
+              console.log(`排除用户: ${userId} === ${currId}`);
+            }
+            return !shouldExclude;
+          });
+        } else {
+          console.log('其他浏览器无效userId，显示全部用户');
+          filteredList = data.data;
+        }
+      }
+      
+      console.log('过滤后用户数据总数:', filteredList.length);
+      console.groupEnd();
+      
+      // 重新映射字段以适应现有组件
+      const mappedUsers = filteredList.map(user => ({
+        id: user.userId,
+        nickname: user.nickname,
+        avatarUrl: user.avatarUrl,
+        department: user.department,
+        school: user.school,
+        authStatus: user.authStatus
+      }));
+      
+      // 检查好友关系
+      await checkFriendRelationship(mappedUsers);
+      
+      users.value = mappedUsers;
+    } else {
+      ElMessage.error(data.message || '获取用户列表失败');
+    }
+  } catch (error) {
+    console.error('获取用户列表失败', error);
+    ElMessage.error('获取用户列表失败，请检查网络连接');
+  } finally {
+    loadingUsers.value = false;
+  }
+};
+
+// 检查好友关系状态
+const checkFriendRelationship = async (userList) => {
+  if (!userList || userList.length === 0) return;
+  
+  try {
+    // 逐一检查每个用户的好友关系
+    for (const user of userList) {
+      const data = await checkFriendStatus(user.id);
+      if (data.code === 200) {
+        // 根据返回结果设置好友状态
+        user.friendStatus = data.data.status || 'none';
+      } else {
+        user.friendStatus = 'none';
+      }
+    }
+  } catch (error) {
+    console.error('检查好友关系失败', error);
+    // 出错时默认设置为none
+    userList.forEach(user => user.friendStatus = 'none');
+  }
+};
+
+// 过滤用户列表
+const filteredUsers = computed(() => {
+  if (!searchQuery.value) {
+    return users.value;
+  }
+  
+  const query = searchQuery.value.toLowerCase();
+  return users.value.filter(user => {
+    const nickname = (user.nickname || '').toLowerCase();
+    const school = (user.school || '').toLowerCase();
+    const department = (user.department || '').toLowerCase();
+    
+    return nickname.includes(query) || 
+           school.includes(query) || 
+           department.includes(query);
+  });
+});
+
+// 显示添加好友对话框
+const showAddFriendDialog = (user) => {
+  currentUser.value = user;
+  requestMessage.value = '';
+  addFriendDialogVisible.value = true;
+  // 打开对话框时禁用背景滚动
+  document.body.style.overflow = 'hidden';
+};
+
+// 取消添加好友
+const cancelAddFriend = () => {
+  addFriendDialogVisible.value = false;
+  // 恢复背景滚动
+  document.body.style.overflow = '';
+  // 重置数据
+  requestMessage.value = '';
+  setTimeout(() => {
+    currentUser.value = null;
+  }, 200);
+};
+
+// 发送好友请求
+const sendFriendRequest = async () => {
+  if (!currentUser.value) return;
+  
+  try {
+    const data = await apiSendFriendRequest(currentUser.value.id, requestMessage.value);
+    if (data.code === 200) {
+      ElMessage.success('好友请求已发送');
+      addFriendDialogVisible.value = false;
+      
+      // 更新用户状态为已发送请求
+      const userIndex = users.value.findIndex(u => u.id === currentUser.value.id);
+      if (userIndex !== -1) {
+        users.value[userIndex].friendStatus = 'requested';
+      }
+      
+      // 刷新发送的请求列表
+      if (activeTab.value === 'sentRequests') {
+        fetchSentRequests();
+      }
+    } else {
+      ElMessage.error(data.message || '发送好友请求失败');
+    }
+  } catch (error) {
+    console.error('发送好友请求失败', error);
+    ElMessage.error('发送好友请求失败，请检查网络连接');
+  }
+};
+
+// 查看用户资料
+const viewUserProfile = (userId) => {
+  router.push(`/user/${userId}`);
+};
+
+// 搜索处理
+const handleSearch = () => {
+  // 防抖可以在这里实现
+};
+
+// 标签页切换
+const handleTabClick = () => {
+  switch (activeTab.value) {
+    case 'friendsList':
+      fetchFriends();
+      break;
+    case 'receivedRequests':
+      fetchReceivedRequests();
+      break;
+    case 'sentRequests':
+      fetchSentRequests();
+      break;
+    case 'allUsers':
+      fetchUsers();
+      break;
+  }
+};
+
+// 设置定时刷新待处理请求数量
+const setupPendingRequestsTimer = () => {
+  // 每60秒刷新一次待处理请求数量
+  countTimer = setInterval(() => {
+    fetchPendingRequestCount();
+  }, 60000);
+};
+
+onMounted(() => {
+  // 根据初始标签页加载数据
+  if (activeTab.value === 'friendsList') {
+    fetchFriends();
+  }
+  
+  // 获取待处理的好友请求数量
+  fetchPendingRequestCount();
+  
+  // 设置定时刷新
+  setupPendingRequestsTimer();
+});
+
+onBeforeUnmount(() => {
+  // 清除定时器
+  if (countTimer) {
+    clearInterval(countTimer);
+    countTimer = null;
+  }
+});
+</script>
+
+<style scoped>
+.friends-page {
+  width: 96%;
+  margin: 0 auto;
+  padding-top: 40px; /* 为顶栏留出空间 */
+  min-height: calc(100vh - 60px);
+  position: relative;
+  background-color: #f9fafc;
+}
+
+.friends-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  margin: 0;
+  padding: 0;
+}
+
+.override-container {
+  margin-left: -6px;
+  width: calc(100% + 6px);
+  padding-right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.main-card {
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+  background-color: #ffffff;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  transition: all 0.3s ease;
+  margin-bottom: 15px;
+  max-width: 1300px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.main-card:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.main-card :deep(.el-card__body) {
+  padding: 12px 20px 15px;
+  background-color: #ffffff;
+}
+
+.card-header {
+  padding: 0 0 16px 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0;
+  padding: 0;
+  letter-spacing: 0.5px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  background: linear-gradient(to bottom, #fafbfc, #f5f7fa);
+  border-radius: 12px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.02);
+}
+
+.loading-spinner {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.spinner-circle {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 4px solid rgba(22, 119, 255, 0.15);
+  border-top-color: #409EFF;
+  animation: spin 1.2s infinite cubic-bezier(0.55, 0.15, 0.45, 0.85);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  margin-top: 24px;
+  color: #606266;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* 改进的瀑布流布局 */
+.masonry-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-gap: 24px;
+  margin-top: 20px;
+  padding: 10px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 在较大屏幕上使用3列 */
+@media (min-width: 768px) {
+  .masonry-container {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+/* 在更大的屏幕上使用4列 */
+@media (min-width: 1200px) {
+  .masonry-container {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+}
+
+/* 美化卡片组件样式 */
+:deep(.friend-card),
+:deep(.user-card),
+:deep(.request-card) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s;
+  border: none;
+}
+
+:deep(.friend-card:hover),
+:deep(.user-card:hover),
+:deep(.request-card:hover) {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+:deep(.card-content) {
+  padding: 18px 20px;
+}
+
+/* 美化卡片内按钮 */
+:deep(.card-actions) {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid #f5f5f5;
+}
+
+:deep(.card-actions .el-button) {
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+:deep(.card-actions .el-button--primary) {
+  background-color: #409EFF;
+  border-color: #409EFF;
+}
+
+:deep(.card-actions .el-button--primary:hover) {
+  background-color: #66b1ff;
+  border-color: #66b1ff;
+  transform: translateY(-2px);
+}
+
+:deep(.card-actions .el-button--danger) {
+  background-color: #fff;
+  color: #f56c6c;
+  border-color: #fbc4c4;
+}
+
+:deep(.card-actions .el-button--danger:hover) {
+  background-color: #f56c6c;
+  color: #fff;
+  border-color: #f56c6c;
+  transform: translateY(-2px);
+}
+
+.search-container {
+  padding: 20px 0;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.search-box {
+  max-width: 600px;
+  margin: 0 auto;
+  transition: all 0.3s;
+}
+
+.search-box:focus-within {
+  transform: translateY(-2px);
+}
+
+.search-box :deep(.el-input__wrapper) {
+  border-radius: 24px;
+  padding-left: 16px;
+  height: 48px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8e8e8;
+  transition: all 0.3s;
+}
+
+.search-box :deep(.el-input__wrapper:hover),
+.search-box :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  border-color: #409EFF;
+}
+
+.search-box :deep(.el-input__inner) {
+  font-size: 16px;
+  height: 46px;
+  font-weight: 400;
+  color: #333;
+  caret-color: #409EFF;
+}
+
+.search-box :deep(.el-input__inner::placeholder) {
+  color: #909399;
+  font-weight: 400;
+}
+
+.search-box :deep(.el-input__prefix) {
+  color: #409EFF;
+  font-size: 18px;
+  margin-right: 8px;
+}
+
+/* 空状态样式 */
+.empty-state {
+  text-align: center;
+  padding: 40px 0;
+  margin: 20px 0;
+  background-color: #f9fafc;
+  border-radius: 12px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.02);
+}
+
+.empty-state :deep(.el-empty__image) {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 20px;
+}
+
+.empty-state :deep(.el-empty__description) {
+  color: #606266;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.empty-state .el-button {
+  margin-top: 24px;
+  padding: 12px 32px;
+  border-radius: 24px;
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+  transition: all 0.3s;
+}
+
+.empty-state .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.3);
+}
+
+/* 对话框样式 */
+:deep(.el-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  position: fixed !important;
+  margin-top: 15vh !important;
+}
+
+:deep(.el-dialog__header) {
+  padding: 20px 24px;
+  margin: 0;
+  border-bottom: 1px solid #f0f2f5;
+  background-color: #fafbfc;
+}
+
+:deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+:deep(.el-dialog__headerbtn) {
+  top: 20px;
+  right: 20px;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+  color: #606266;
+}
+
+/* 添加好友对话框特定样式 */
+.friend-dialog {
+  z-index: 9999 !important;
+}
+
+.friend-dialog :deep(.el-dialog__wrapper) {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.friend-dialog :deep(.el-overlay) {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9000;
+}
+
+.add-friend-content {
+  padding: 10px 0;
+}
+
+.dialog-user-name {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.message-input {
+  margin-top: 10px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+  font-size: 15px;
+}
+
+:deep(.el-dialog__body p) {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+:deep(.el-dialog__body .el-textarea) {
+  margin-top: 16px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f2f5;
+}
+
+.dialog-footer .el-button {
+  margin-left: 16px;
+  min-width: 90px;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 10px 20px;
+  transition: all 0.25s;
+}
+
+.dialog-footer .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dialog-footer .el-button--primary {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+}
+
+.dialog-footer .el-button--danger {
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.15);
+}
+
+/* 标签页样式优化 */
+.friends-tabs {
+  margin-top: 10px;
+}
+
+.friends-tabs :deep(.el-tabs__header) {
+  margin-bottom: 24px;
+  border-bottom: none;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.friends-tabs :deep(.el-tabs__nav-wrap) {
+  margin-bottom: 0;
+}
+
+.friends-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.friends-tabs :deep(.el-tabs__nav) {
+  width: 100%;
+  display: flex;
+  background-color: transparent;
+}
+
+.friends-tabs :deep(.el-tabs__item) {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  padding: 0;
+  height: 40px;
+  line-height: 40px;
+  transition: all 0.25s ease;
+  font-weight: 500;
+  color: #606266;
+  position: relative;
+}
+
+.friends-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+.friends-tabs :deep(.el-tabs__item.is-active) {
+  background-color: #ffffff;
+  color: #409EFF;
+  font-weight: 600;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.friends-tabs :deep(.el-tabs__item:not(.is-active):hover) {
+  color: #409EFF;
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: 6px;
+}
+
+.friends-tabs :deep(.el-tabs__content) {
+  padding: 10px 0;
+}
+</style>
