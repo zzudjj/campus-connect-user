@@ -25,6 +25,17 @@
         <el-badge v-if="pendingRequestCount > 0" :value="pendingRequestCount" class="request-badge" />
       </div>
       
+      <!-- 聊天选项 -->
+      <div
+        class="nav-item"
+        :class="{ active: route.path === '/chat' }"
+        @click="router.push('/chat')"
+      >
+        <el-icon><i-ep-chat-dot-round /></el-icon>
+        <span>聊天</span>
+        <el-badge v-if="unreadMessageCount > 0" :value="unreadMessageCount" class="message-badge" />
+      </div>
+      
       <div
         class="nav-item"
         :class="{ active: route.path === '/user' }"
@@ -40,21 +51,23 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { House, User, UserFilled, Message } from '@element-plus/icons-vue';
+import { House, User, UserFilled, ChatDotRound } from '@element-plus/icons-vue';
+import { getConversations } from '../../api/chat';
 
 const route = useRoute();
 const router = useRouter();
 const pendingRequestCount = ref(0);
+const unreadMessageCount = ref(0);
 
 // 获取待处理好友请求数量
 const fetchPendingRequestCount = async () => {
   try {
-    const response = await fetch('/friend/request/pending/count', {
+    const data = await fetch('http://localhost:8080/friend/request/pending/count', {
       headers: {
         'token': localStorage.getItem('token')
       }
-    });
-    const data = await response.json();
+    }).then(res => res.json());
+    
     if (data.code === 200) {
       pendingRequestCount.value = data.data;
     }
@@ -63,22 +76,39 @@ const fetchPendingRequestCount = async () => {
   }
 };
 
-// 定时器ID
-let countTimer = null;
+// 获取未读消息数量
+const fetchUnreadMessageCount = async () => {
+  try {
+    const data = await getConversations();
+    if (data.code === 200) {
+      // 计算未读消息数量
+      const unreadCount = data.data.filter(conversation => conversation.readStatus === 0).length;
+      unreadMessageCount.value = unreadCount;
+    }
+  } catch (error) {
+    console.error('获取未读消息数量失败', error);
+  }
+};
+
+let requestTimer;
+let messageTimer;
 
 onMounted(() => {
-  // 立即获取一次数据
+  // 初始化待处理请求数量和未读消息数量
   fetchPendingRequestCount();
+  fetchUnreadMessageCount();
   
-  // 设置定时器，每分钟获取一次数据
-  countTimer = setInterval(fetchPendingRequestCount, 60000);
+  // 设置定时器，每分钟获取一次待处理请求数量
+  requestTimer = setInterval(fetchPendingRequestCount, 60000);
+  
+  // 设置定时器，每30秒获取一次未读消息数量
+  messageTimer = setInterval(fetchUnreadMessageCount, 30000);
 });
 
 onBeforeUnmount(() => {
-  // 组件卸载前清除定时器
-  if (countTimer) {
-    clearInterval(countTimer);
-  }
+  // 清除定时器
+  if (requestTimer) clearInterval(requestTimer);
+  if (messageTimer) clearInterval(messageTimer);
 });
 </script>
 

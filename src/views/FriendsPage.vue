@@ -144,7 +144,7 @@
         <el-dialog
           v-model="addFriendDialogVisible"
           title="添加好友"
-          width="30%"
+          width="400px"
           append-to-body
           :modal-append-to-body="true"
           :lock-scroll="true"
@@ -152,23 +152,38 @@
           :show-close="true"
           destroy-on-close
           custom-class="friend-dialog"
+          :top="'15vh'"
         >
           <div v-if="currentUser" class="add-friend-content">
-            <p class="dialog-user-name">发送好友请求给 {{ currentUser.nickname || `用户${currentUser.id}` }}</p>
-            <el-input
-              v-model="requestMessage"
-              type="textarea"
-              :rows="3"
-              placeholder="添加验证消息（选填）"
-              maxlength="100"
-              show-word-limit
-              class="message-input"
-            />
+            <div class="friend-request-header">
+              <el-avatar :size="64" :src="currentUser.avatarUrl || '/default-avatar.png'" class="friend-avatar" />
+              <div class="friend-info">
+                <h3 class="friend-name">{{ currentUser.nickname || `用户${currentUser.id}` }}</h3>
+                <p class="friend-meta" v-if="currentUser.school || currentUser.department">
+                  {{ currentUser.school || '' }} {{ currentUser.department || '' }}
+                </p>
+              </div>
+            </div>
+            
+            <div class="message-section">
+              <p class="message-label">添加验证消息<span class="optional-tag">（选填）</span></p>
+              <el-input
+                v-model="requestMessage"
+                type="textarea"
+                :rows="3"
+                placeholder="说点什么吧..."
+                maxlength="100"
+                show-word-limit
+                class="message-input"
+              />
+            </div>
           </div>
           <template #footer>
             <div class="dialog-footer">
-              <el-button @click="cancelAddFriend">取消</el-button>
-              <el-button type="primary" @click="sendFriendRequest">发送请求</el-button>
+              <el-button plain @click="cancelAddFriend" class="cancel-btn">取消</el-button>
+              <el-button type="primary" @click="sendFriendRequest" class="send-btn">
+                <i class="fas fa-paper-plane"></i> 发送请求
+              </el-button>
             </div>
           </template>
         </el-dialog>
@@ -198,7 +213,7 @@ import {
   checkFriendStatus, 
   sendFriendRequest as apiSendFriendRequest 
 } from '../api/friend.js';
-import { getAllUsers } from '../api/user.js';
+import { getAllUsers, getUserPublicProfile } from '../api/user.js';
 
 const router = useRouter();
 
@@ -288,6 +303,11 @@ const fetchReceivedRequests = async () => {
     const data = await getReceivedRequests();
     if (data.code === 200) {
       receivedRequests.value = data.data || [];
+      // 打印收到的请求数据以便调试
+      console.group('收到的好友请求数据');
+      console.log('数据:', receivedRequests.value);
+      console.log('第一条数据的字段:', receivedRequests.value.length > 0 ? Object.keys(receivedRequests.value[0]) : []);
+      console.groupEnd();
       // 更新待处理请求数量
       pendingRequestCount.value = receivedRequests.value.filter(req => req.status === 0).length;
     } else {
@@ -301,13 +321,47 @@ const fetchReceivedRequests = async () => {
   }
 };
 
-// 获取发送的好友请求
+// 获取发送的好友请求 - 使用getUserPublicProfile API
 const fetchSentRequests = async () => {
   loadingSent.value = true;
   try {
     const data = await getSentRequests();
     if (data.code === 200) {
-      sentRequests.value = data.data || [];
+      // 处理发送请求列表，为每个请求添加接收方的信息
+      const requests = data.data || [];
+      
+      // 使用getUserPublicProfile API获取用户信息
+      const processedRequests = await Promise.all(requests.map(async (req) => {
+        try {
+          // 使用getUserPublicProfile API获取用户公开资料
+          const userRes = await getUserPublicProfile(req.recipientId);
+          
+          if (userRes && userRes.code === 200 && userRes.data) {
+            // 从用户信息中提取头像和昵称
+            return {
+              ...req,
+              // 使用getUserPublicProfile返回的字段名称
+              recipientName: userRes.data.nickname || `用户${req.recipientId}`,
+              recipientAvatarUrl: userRes.data.avatarUrl || '/default-avatar.png'
+            };
+          } else {
+            return {
+              ...req,
+              recipientAvatarUrl: '/default-avatar.png',
+              recipientName: `用户${req.recipientId}`
+            };
+          }
+        } catch (err) {
+          console.error(`获取用户${req.recipientId}公开资料失败:`, err);
+          return {
+            ...req,
+            recipientAvatarUrl: '/default-avatar.png',
+            recipientName: `用户${req.recipientId}`
+          };
+        }
+      }));
+      
+      sentRequests.value = processedRequests;
     } else {
       ElMessage.error(data.message || '获取发送的好友请求失败');
     }
@@ -566,20 +620,40 @@ const sendFriendRequest = async () => {
   if (!currentUser.value) return;
   
   try {
+    // 发送请求
     const data = await apiSendFriendRequest(currentUser.value.id, requestMessage.value);
     if (data.code === 200) {
+      const requestId = data.data; // 新创建的请求ID
+      
       ElMessage.success('好友请求已发送');
       addFriendDialogVisible.value = false;
       
       // 更新用户状态为已发送请求
       const userIndex = users.value.findIndex(u => u.id === currentUser.value.id);
       if (userIndex !== -1) {
-        users.value[userIndex].friendStatus = 'requested';
+        users.value[userIndex].friendStatus = 'pending';
       }
       
-      // 刷新发送的请求列表
+      // 将该请求添加到发送的请求列表中
+      // 确保我们保存接收方的头像和昵称
+      const newRequest = {
+        requestId: requestId,
+        requesterId: JSON.parse(localStorage.getItem('userInfo')).userId, // 当前用户ID
+        recipientId: currentUser.value.id, // 接收方ID
+        recipientName: currentUser.value.nickname || `用户${currentUser.value.id}`, // 接收方昵称
+        recipientAvatarUrl: currentUser.value.avatarUrl || '/default-avatar.png', // 接收方头像
+        message: requestMessage.value,
+        status: 0, // 状态：等待处理
+        createdAt: new Date().toISOString()
+      };
+      
+      // 将新请求添加到列表中
+      sentRequests.value.unshift(newRequest);
+      
+      // 刷新发送的请求列表(如果当前标签页是发送的请求)
       if (activeTab.value === 'sentRequests') {
-        fetchSentRequests();
+        // 数据已经更新，不需要重新获取
+        loadingSent.value = false;
       }
     } else {
       ElMessage.error(data.message || '发送好友请求失败');
@@ -998,26 +1072,149 @@ onBeforeUnmount(() => {
   z-index: 9000;
 }
 
-.add-friend-content {
-  padding: 10px 0;
+.friend-dialog :deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
-.dialog-user-name {
-  font-size: 16px;
-  margin-bottom: 15px;
+.friend-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(90deg, #3b91ff, #6cc5ff);
+  padding: 18px 20px;
+  margin: 0;
+  text-align: center;
+  position: relative;
+}
+
+.friend-dialog :deep(.el-dialog__title) {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.friend-dialog :deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 20px;
+}
+
+.friend-dialog :deep(.el-dialog__headerbtn:hover .el-dialog__close) {
+  color: #fff;
+}
+
+.friend-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+.add-friend-content {
+  padding: 5px 0 15px;
+}
+
+.friend-request-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.friend-avatar {
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(59, 145, 255, 0.2);
+}
+
+.friend-info {
+  flex: 1;
+}
+
+.friend-name {
+  font-size: 18px;
+  font-weight: 600;
   color: #303133;
+  margin: 0 0 8px;
+}
+
+.friend-meta {
+  font-size: 14px;
+  color: #606266;
+  margin: 0;
+}
+
+.message-section {
+  margin-top: 10px;
+}
+
+.message-label {
+  font-size: 15px;
   font-weight: 500;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.optional-tag {
+  font-size: 13px;
+  color: #909399;
+  font-weight: normal;
+  margin-left: 4px;
 }
 
 .message-input {
-  margin-top: 10px;
+  margin-top: 5px;
+}
+
+.message-input :deep(.el-textarea__inner) {
+  border-radius: 12px;
+  padding: 12px 16px;
+  border-color: #e4e7ed;
+  font-size: 15px;
+  resize: none;
+  transition: all 0.3s;
+}
+
+.message-input :deep(.el-textarea__inner:focus) {
+  border-color: #3b91ff;
+  box-shadow: 0 0 0 2px rgba(59, 145, 255, 0.2);
+}
+
+.message-input :deep(.el-input__count) {
+  background: transparent;
+  font-size: 12px;
+  color: #909399;
+  padding: 2px 6px;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding-top: 10px;
+  padding-top: 15px;
+}
+
+.dialog-footer .cancel-btn {
+  border-radius: 24px;
+  padding: 10px 20px;
+  transition: all 0.3s;
+}
+
+.dialog-footer .send-btn {
+  border-radius: 24px;
+  padding: 10px 24px;
+  background: linear-gradient(90deg, #3b91ff, #6cc5ff);
+  border: none;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(59, 145, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.dialog-footer .send-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 145, 255, 0.4);
+}
+
+.dialog-footer .send-btn i {
+  margin-right: 6px;
   font-size: 15px;
 }
 

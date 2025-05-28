@@ -172,16 +172,19 @@ export const checkFriendStatus = async (userId) => {
  */
 export const sendFriendRequest = async (userId, message) => {
   try {
-    const formData = new FormData();
-    formData.append('userId', userId);
+    // 使用URLSearchParams代替FormData，因为服务器需要application/x-www-form-urlencoded格式
+    const params = new URLSearchParams();
+    // 使用正确的参数名：recipientId
+    params.append('recipientId', userId);
     if (message) {
-      formData.append('message', message);
+      params.append('message', message);
     }
     
     const response = await axios.post(`${baseURL}/friend/request/send`, 
-      formData,
+      params,
       {
         headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
           'token': localStorage.getItem('token')
         }
       }

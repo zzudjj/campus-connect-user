@@ -52,30 +52,6 @@ export const updateUser = (data, token) => {
 };
 
 /**
- * 获取用户信息
- * @param {Number} userId 用户ID
- * @returns {Promise} 返回用户信息
- */
-export const getUserInfo = (userId) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        code: 200,
-        data: {
-          userId: userId,
-          username: '用户' + userId,
-          avatar: 'https://via.placeholder.com/150',
-          followCount: 120,
-          fansCount: 60,
-          likeCount: 300
-        },
-        message: '获取成功'
-      })
-    }, 500)
-  })
-}
-
-/**
  * 获取用户公开资料
  * @param {Number} userId 用户ID
  * @returns {Promise} 返回用户公开资料

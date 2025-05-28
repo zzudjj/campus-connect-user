@@ -103,6 +103,20 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userInfo');
     
+    // 关闭WebSocket连接
+    try {
+      // 动态导入ChatSocketService，避免循环依赖
+      import('../services/ChatSocketService').then(module => {
+        const chatSocketService = module.default;
+        if (chatSocketService) {
+          console.log('用户登出，关闭WebSocket连接');
+          chatSocketService.disconnect();
+        }
+      });
+    } catch (error) {
+      console.error('关闭WebSocket连接失败', error);
+    }
+    
     ElMessage.success('已成功退出登录');
   };
 

@@ -3,10 +3,14 @@
     <el-card class="request-card" shadow="hover">
       <!-- 请求者信息区 -->
       <div class="request-header">
-        <el-avatar :src="request.requesterAvatarUrl || request.recipientAvatarUrl || '/default-avatar.png'" class="request-avatar" />
+        <!-- 使用正确的头像展示逻辑 -->
+        <el-avatar 
+          :src="getAvatarUrl()" 
+          class="request-avatar" 
+        />
         <div class="request-info">
           <div class="request-name">
-            {{ isReceived ? request.requesterNickname : `发给：${request.recipientName || `用户${request.recipientId}`}` }}
+            {{ isReceived ? getNickname() : `发给：${getNickname()}` }}
           </div>
           <div class="request-meta">
             <span v-if="isReceived">收到的好友请求</span>
@@ -75,6 +79,66 @@ const props = defineProps({
 
 defineEmits(['accept', 'reject']);
 
+// 获取头像地址
+const getAvatarUrl = () => {
+  const defaultAvatar = '/default-avatar.png';
+  
+  if (props.isReceived) {
+    // 收到的请求，显示请求者的头像
+    // 尝试各种可能的字段名
+    if (props.request.requesterAvatarUrl) {
+      return props.request.requesterAvatarUrl;
+    } else if (props.request.requesterAvatar) {
+      return props.request.requesterAvatar;
+    } else if (props.request.avatarUrl) {
+      return props.request.avatarUrl;
+    } else {
+      return defaultAvatar;
+    }
+  } else {
+    // 发送的请求，显示接收者的头像
+    // 尝试各种可能的字段名
+    if (props.request.recipientAvatarUrl) {
+      return props.request.recipientAvatarUrl;
+    } else if (props.request.recipientAvatar) {
+      return props.request.recipientAvatar;
+    } else if (props.request.toUserAvatar) {
+      return props.request.toUserAvatar;
+    } else {
+      return defaultAvatar;
+    }
+  }
+};
+
+// 获取显示的昵称
+const getNickname = () => {
+  if (props.isReceived) {
+    // 收到的请求，显示请求者的昵称
+    // 尝试各种可能的字段名
+    if (props.request.requesterNickname) {
+      return props.request.requesterNickname;
+    } else if (props.request.requesterName) {
+      return props.request.requesterName;
+    } else if (props.request.nickname) {
+      return props.request.nickname;
+    } else {
+      return `用户${props.request.requesterId || props.request.userId || 'Unknown'}`;
+    }
+  } else {
+    // 发送的请求，显示接收者的昵称
+    // 尝试各种可能的字段名
+    if (props.request.recipientName) {
+      return props.request.recipientName;
+    } else if (props.request.recipientNickname) {
+      return props.request.recipientNickname;
+    } else if (props.request.toUserName) {
+      return props.request.toUserName;
+    } else {
+      return `用户${props.request.recipientId || props.request.toUserId || 'Unknown'}`;
+    }
+  }
+};
+
 // 格式化时间
 const formatTime = (timeString) => {
   if (!timeString) return '';
@@ -105,24 +169,27 @@ const formatTime = (timeString) => {
 }
 
 .request-card {
-  border-radius: 24px;
+  border-radius: 16px;
   overflow: hidden;
-  transition: box-shadow 0.3s;
+  transition: all 0.3s ease;
   min-width: 0;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   width: 100%;
   position: relative;
   background-color: #ffffff;
-  border: 1px solid #e6e6e6;
+  border: none;
+  overflow: visible;
 }
 
 .request-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
 }
 
 .request-card :deep(.el-card__body) {
-  padding: 24px 30px;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
 }
 
 .request-header {
@@ -136,6 +203,14 @@ const formatTime = (timeString) => {
 .request-avatar {
   width: 70px;
   height: 70px;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.request-card:hover .request-avatar {
+  transform: scale(1.05);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
 }
 
 .request-info {
@@ -182,8 +257,8 @@ const formatTime = (timeString) => {
 
 .request-message {
   margin: 12px 0 20px;
-  padding: 16px 20px;
-  background-color: #f9f9f9;
+  padding: 20px 24px;
+  background-color: #f7f9fe;
   border-radius: 12px;
   font-size: 16px;
   color: #333;
@@ -191,14 +266,29 @@ const formatTime = (timeString) => {
   word-break: break-word;
   white-space: pre-line;
   position: relative;
+  border-left: 4px solid #1890ff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  transition: all 0.3s ease;
+}
+
+.request-card:hover .request-message {
+  background-color: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .quote-icon {
-  color: #ddd;
+  color: #1890ff;
   font-size: 18px;
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 15px;
+  left: 15px;
+  opacity: 0.6;
+  transition: all 0.3s ease;
+}
+
+.request-card:hover .quote-icon {
+  transform: scale(1.1);
+  opacity: 0.8;
 }
 
 .request-message {
@@ -209,17 +299,21 @@ const formatTime = (timeString) => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 12px;
+  margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  position: relative;
 }
 
 .request-actions :deep(.el-button) {
-  border-radius: 8px;
+  border-radius: 20px;
   transition: all 0.3s;
-  padding: 8px 16px;
+  padding: 10px 20px;
   font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .request-actions :deep(.el-button i) {
@@ -228,6 +322,7 @@ const formatTime = (timeString) => {
 
 .request-actions :deep(.el-button:hover) {
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .request-actions :deep(.el-button.el-button--primary:hover) {
@@ -241,9 +336,18 @@ const formatTime = (timeString) => {
 .request-status-info {
   font-size: 15px;
   color: #666;
-  padding: 6px 0;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
+  background-color: #f9f9f9;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.request-card:hover .request-status-info {
+  box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
 }
 
 .request-status-info i {

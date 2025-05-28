@@ -3,6 +3,7 @@ import MainPage from '../views/MainPage.vue';
 import FeedPage from '../views/FeedPage.vue';
 import UserProfile from '../views/UserProfile.vue';
 import FriendsPage from '../views/FriendsPage.vue';
+import ChatPage from '../views/ChatPage.vue';
 
 const routes = [
   {
@@ -24,6 +25,12 @@ const routes = [
         path: 'friends',
         name: 'Friends',
         component: FriendsPage
+      },
+      // 聊天模块
+      {
+        path: 'chat',
+        name: 'Chat',
+        component: ChatPage
       }
       // 这里可继续添加其它主内容区页面
     ]
