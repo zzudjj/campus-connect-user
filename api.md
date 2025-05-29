@@ -13,6 +13,7 @@
   - [3.6 发送注册验证码](#36-发送注册验证码)
   - [3.7 批量获取用户简要信息](#37-批量获取用户简要信息)
   - [3.8 获取所有用户简要信息](#38-获取所有用户简要信息)
+  - [3.9 上传校园卡](#39-上传校园卡)
 - [4. 密码重置模块](#4-密码重置模块)
   - [4.1 请求密码重置验证码](#41-请求密码重置验证码)
   - [4.2 验证邮箱验证码](#42-验证邮箱验证码)
@@ -471,6 +472,44 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
       "school": "某大学"
     }
   ]
+}
+```
+
+### 3.9 上传校园卡
+
+上传用户校园卡正反面照片URL，用于身份认证。
+
+**请求URL**: `/user/uploadCard`
+
+**请求方式**: `POST`
+
+**请求头**:
+- `Content-Type`: `application/json`
+- `token`: `{token值}` (需要登录验证)
+
+**请求参数** (@RequestBody):
+
+| 参数名 | 类型 | 必填 | 描述 |
+| ------ | ---- | ---- | ---- |
+| beforeCardUrl | String | 是 | 校园卡正面照片URL |
+| afterCardUrl | String | 是 | 校园卡反面照片URL |
+
+**请求示例**:
+
+```json
+{
+  "beforeCardUrl": "https://example.com/card/front.jpg",
+  "afterCardUrl": "https://example.com/card/back.jpg"
+}
+```
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "名片上传成功",
+  "data": null
 }
 ```
 

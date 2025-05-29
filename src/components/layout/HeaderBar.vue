@@ -21,7 +21,7 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人主页</el-dropdown-item>
-              <el-dropdown-item command="settings">账号设置</el-dropdown-item>
+              <el-dropdown-item command="verification">账号认证</el-dropdown-item>
               <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -66,9 +66,9 @@ const handleCommand = (command) => {
     case 'profile':
       router.push('/user');
       break;
-    case 'settings':
-      // 这里可以添加账号设置页面路由
-      router.push('/settings');
+    case 'verification':
+      // 账号认证页面路由
+      router.push('/verification');
       break;
     case 'logout':
       userStore.logout();

@@ -1,198 +1,206 @@
 <template>
-  <div class="xhs-post-detail-container" :class="{ 'is-mobile': isMobile }">
-    <!-- 关闭按钮 -->
-    <div class="close-button" @click="close">
-      <i class="fas fa-times"></i>
-    </div>
-    
-    <!-- 左侧媒体区域 -->
-    <div class="media-section">
-      <!-- 轮播图，如果有多张图片/视频 -->
-      <el-carousel 
-        v-if="post.media && post.media.length > 0"
-        indicator-position="outside"
-        arrow="always"
-        height="100%"
-        :autoplay="false"
-        :initial-index="currentMediaIndex"
-        @change="handleMediaChange"
-      >
-        <el-carousel-item v-for="(media, index) in post.media" :key="index">
-          <!-- 图片媒体 -->
-          <div v-if="media.type === 0" class="media-wrapper image">
-            <img :src="media.url" class="media-content" />
-          </div>
-          
-          <!-- 视频媒体 -->
-          <div v-else-if="media.type === 1" class="media-wrapper video">
-            <video 
-              :src="media.url" 
-              class="media-content video" 
-              controls 
-              :poster="media.thumbnailUrl || media.backgroundUrl"
-            ></video>
-          </div>
-        </el-carousel-item>
-      </el-carousel>
-      
-      <!-- 如果没有媒体内容，显示占位图 -->
-      <div v-else class="no-media">
-        <i class="fas fa-image"></i>
-        <p>暂无媒体内容</p>
+  <!-- 使用 teleport 将模态框渲染到 body -->
+  <teleport to="body">
+    <!-- 全屏遮罩层 -->
+    <div v-if="visible" class="xhs-modal-overlay" @click="close">
+    <div class="xhs-post-detail-container" :class="{ 'is-mobile': isMobile }" @click.stop>
+      <!-- 关闭按钮 -->
+      <div class="close-button" @click="close">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
       </div>
-    </div>
-    
-    <!-- 右侧内容区域 -->
-    <div class="content-section">
-      <!-- 用户信息 -->
-      <div class="user-info">
-        <el-avatar :size="40" :src="post.userAvatar"></el-avatar>
-        <div class="user-meta">
-          <div class="username">
-            {{ post.username }}
-            <span v-if="post.authStatus === 2" class="auth-badge verified" title="已认证用户">
-              <i class="fas fa-check-circle"></i>
+
+      <!-- 左侧媒体区域 -->
+      <div class="media-section">
+        <!-- 轮播图，如果有多张图片/视频 -->
+        <el-carousel
+          v-if="post.media && post.media.length > 0"
+          indicator-position="outside"
+          arrow="always"
+          height="100%"
+          :autoplay="false"
+          :initial-index="currentMediaIndex"
+          @change="handleMediaChange"
+        >
+          <el-carousel-item v-for="(media, index) in post.media" :key="index">
+            <!-- 图片媒体 -->
+            <div v-if="media.type === 0" class="media-wrapper image">
+              <img :src="media.url" class="media-content" />
+            </div>
+
+            <!-- 视频媒体 -->
+            <div v-else-if="media.type === 1" class="media-wrapper video">
+              <video
+                :src="media.url"
+                class="media-content video"
+                controls
+                :poster="media.thumbnailUrl || media.backgroundUrl"
+              ></video>
+            </div>
+          </el-carousel-item>
+        </el-carousel>
+
+        <!-- 如果没有媒体内容，显示占位图 -->
+        <div v-else class="no-media">
+          <i class="fas fa-image"></i>
+          <p>暂无媒体内容</p>
+        </div>
+      </div>
+
+      <!-- 右侧内容区域 -->
+      <div class="content-section">
+        <!-- 用户信息 -->
+        <div class="user-info">
+          <el-avatar :size="40" :src="post.userAvatar || post.avatarUrl"></el-avatar>
+          <div class="user-meta">
+            <div class="username">
+              {{ post.username || post.nickname }}
+              <span v-if="post.authStatus === 2" class="auth-badge verified" title="已认证用户">
+                <i class="fas fa-check-circle"></i>
+              </span>
+            </div>
+            <div class="post-time">{{ formatTime(post.createTime || post.createdAt) }}</div>
+          </div>
+          <el-button
+            size="small"
+            :type="post.isFollowed ? 'primary' : 'default'"
+            round
+            @click="handleFollow"
+          >
+            {{ post.isFollowed ? '已关注' : '关注' }}
+          </el-button>
+        </div>
+
+        <!-- 动态内容 -->
+        <div class="post-content">
+          <p>{{ post.content }}</p>
+
+          <!-- 标签 -->
+          <div v-if="tags.length > 0" class="post-tags">
+            <span v-for="tag in tags" :key="tag" class="tag">
+              #{{ tag }}
             </span>
           </div>
-          <div class="post-time">{{ formatTime(post.createTime) }}</div>
         </div>
-        <el-button 
-          size="small" 
-          :type="post.isFollowed ? 'primary' : 'default'" 
-          round
-          @click="handleFollow"
-        >
-          {{ post.isFollowed ? '已关注' : '关注' }}
-        </el-button>
-      </div>
-      
-      <!-- 动态内容 -->
-      <div class="post-content">
-        <p>{{ post.content }}</p>
-        
-        <!-- 标签 -->
-        <div v-if="tags.length > 0" class="post-tags">
-          <span v-for="tag in tags" :key="tag" class="tag">
-            #{{ tag }}
-          </span>
-        </div>
-      </div>
-      
-      <!-- 互动操作栏 -->
-      <div class="action-bar">
-        <div class="action-item">
-          <el-button 
-            class="action-btn"
-            :type="post.isLiked ? 'danger' : 'default'"
-            circle
-            text
-            @click="handleLike"
-          >
-            <i class="fas" :class="post.isLiked ? 'fa-heart' : 'fa-heart'"></i>
-          </el-button>
-          <span class="count">{{ post.likeCount || 0 }}</span>
-        </div>
-        <div class="action-item">
-          <el-button 
-            class="action-btn"
-            circle
-            text
-            @click="focusCommentInput"
-          >
-            <i class="fas fa-comment"></i>
-          </el-button>
-          <span class="count">{{ post.commentCount || 0 }}</span>
-        </div>
-        <div class="action-item">
-          <el-button 
-            class="action-btn"
-            circle
-            text
-            @click="handleCollect"
-          >
-            <i class="fas" :class="isCollected ? 'fa-bookmark' : 'fa-bookmark'"></i>
-          </el-button>
-          <span class="count">{{ collectionCount }}</span>
-        </div>
-        <div class="action-item">
-          <el-button 
-            class="action-btn"
-            circle
-            text
-            @click="handleShare"
-          >
-            <i class="fas fa-share-alt"></i>
-          </el-button>
-        </div>
-      </div>
-      
-      <!-- 评论区 -->
-      <div class="comments-section">
-        <div class="comments-header">
-          <h3>评论 {{ post.commentCount || 0 }}</h3>
-        </div>
-        
-        <!-- 评论列表 -->
-        <div v-if="comments.length > 0" class="comments-list">
-          <XhsCommentItem 
-            v-for="comment in comments" 
-            :key="comment.id" 
-            :comment="comment"
-            :post-id="post.id"
-            @reply="handleReply"
-            @like="handleCommentLike"
-          />
-        </div>
-        
-        <!-- 空评论状态 -->
-        <div v-else class="no-comments">
-          <i class="fas fa-comment-dots"></i>
-          <p>暂无评论，快来抢沙发</p>
-        </div>
-        
-        <!-- 加载更多 -->
-        <div v-if="hasMoreComments" class="load-more">
-          <el-button text @click="loadMoreComments">加载更多评论</el-button>
-        </div>
-        
-        <!-- 评论输入框 -->
-        <div class="comment-input-wrapper">
-          <el-avatar :size="32" :src="currentUserAvatar"></el-avatar>
-          <div class="comment-input-container">
-            <input 
-              ref="commentInput"
-              v-model="commentText" 
-              class="comment-input" 
-              :placeholder="replyTo ? `回复 @${replyTo.username}：` : '添加评论...'" 
-              @keyup.enter="submitComment"
-            />
-            <div v-if="replyTo" class="reply-badge" @click="cancelReply">
-              回复：@{{ replyTo.username }} <i class="fas fa-times"></i>
-            </div>
-            <el-button 
-              class="send-btn" 
-              :disabled="!commentText.trim()" 
-              size="small"
-              @click="submitComment"
+
+        <!-- 互动操作栏 -->
+        <div class="action-bar">
+          <div class="action-item">
+            <el-button
+              class="action-btn"
+              :type="post.isLiked ? 'danger' : 'default'"
+              circle
+              text
+              @click="handleLike"
             >
-              发送
+              <i class="fas" :class="post.isLiked ? 'fa-heart' : 'fa-heart'"></i>
+            </el-button>
+            <span class="count">{{ post.likeCount || 0 }}</span>
+          </div>
+          <div class="action-item">
+            <el-button
+              class="action-btn"
+              circle
+              text
+              @click="focusCommentInput"
+            >
+              <i class="fas fa-comment"></i>
+            </el-button>
+            <span class="count">{{ post.commentCount || 0 }}</span>
+          </div>
+          <div class="action-item">
+            <el-button
+              class="action-btn"
+              circle
+              text
+              @click="handleCollect"
+            >
+              <i class="fas" :class="isCollected ? 'fa-bookmark' : 'fa-bookmark'"></i>
+            </el-button>
+            <span class="count">{{ collectionCount }}</span>
+          </div>
+          <div class="action-item">
+            <el-button
+              class="action-btn"
+              circle
+              text
+              @click="handleShare"
+            >
+              <i class="fas fa-share-alt"></i>
             </el-button>
           </div>
         </div>
+
+        <!-- 评论区 -->
+        <div class="comments-section">
+          <div class="comments-header">
+            <h3>评论 {{ post.commentCount || 0 }}</h3>
+          </div>
+
+          <!-- 评论列表 -->
+          <div v-if="comments.length > 0" class="comments-list">
+            <XhsCommentItem
+              v-for="comment in comments"
+              :key="comment.id"
+              :comment="comment"
+              :post-id="post.id"
+              @reply="handleReply"
+              @like="handleCommentLike"
+            />
+          </div>
+
+          <!-- 空评论状态 -->
+          <div v-else class="no-comments">
+            <i class="fas fa-comment-dots"></i>
+            <p>暂无评论，快来抢沙发</p>
+          </div>
+
+          <!-- 加载更多 -->
+          <div v-if="hasMoreComments" class="load-more">
+            <el-button text @click="loadMoreComments">加载更多评论</el-button>
+          </div>
+
+          <!-- 评论输入框 -->
+          <div class="comment-input-wrapper">
+            <el-avatar :size="32" :src="currentUserAvatar"></el-avatar>
+            <div class="comment-input-container">
+              <input
+                ref="commentInput"
+                v-model="commentText"
+                class="comment-input"
+                :placeholder="replyTo ? `回复 @${replyTo.username}：` : '添加评论...'"
+                @keyup.enter="submitComment"
+              />
+              <div v-if="replyTo" class="reply-badge" @click="cancelReply">
+                回复：@{{ replyTo.username }} <i class="fas fa-times"></i>
+              </div>
+              <el-button
+                class="send-btn"
+                :disabled="!commentText.trim()"
+                size="small"
+                @click="submitComment"
+              >
+                发送
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+    </div>
+  </teleport>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
 import XhsCommentItem from './XhsCommentItem.vue';
-import { getPostComments } from '@/api/post';
-import { toggleLike } from '@/api/like';
+import { getCommentList, addComment, batchGetUserInfo } from '@/api/comment';
+import { toggleLike, getLikeStatus } from '@/api/like';
 
 // 设置dayjs语言和插件
 dayjs.locale('zh-cn');
@@ -228,12 +236,12 @@ const commentInput = ref(null);
 // 从动态内容中提取标签
 const tags = computed(() => {
   if (!props.post.content) return [];
-  
+
   const tagRegex = /#([^#\s]+)/g;
   const matches = props.post.content.match(tagRegex);
-  
+
   if (!matches) return [];
-  
+
   // 删除#前缀，并去重
   return [...new Set(matches.map(tag => tag.slice(1)))];
 });
@@ -259,13 +267,37 @@ const handleMediaChange = (index) => {
 // 处理点赞
 const handleLike = async () => {
   try {
-    const res = await toggleLike(props.post.id, 0); // 0表示动态
-    if (res.code === 200) {
+    // 先保存原始状态，用于失败时恢复
+    const originalLiked = props.post.isLiked;
+    const originalCount = props.post.likeCount || 0;
+
+    // 立即更新UI，提高响应速度
+    props.post.isLiked = !props.post.isLiked;
+    props.post.likeCount = props.post.isLiked ? originalCount + 1 : Math.max(0, originalCount - 1);
+
+    // 调用API切换点赞状态
+    const response = await toggleLike(props.post.id, 0); // 0表示动态
+
+    if (response.code === 200) {
+      // 使用服务器返回的正确数据更新UI
+      props.post.isLiked = response.data.liked;
+      props.post.likeCount = response.data.likeCount;
+      console.log('动态点赞状态已更新:', response.data);
+
+      // 通知父组件
       emit('like', props.post.id);
+    } else {
+      // 如果请求失败，恢复原始状态
+      props.post.isLiked = originalLiked;
+      props.post.likeCount = originalCount;
+      ElMessage.error('点赞操作失败: ' + response.message);
     }
   } catch (error) {
-    console.error('点赞失败:', error);
-    ElMessage.error('点赞失败，请重试');
+    console.error('点赞动态失败:', error);
+    // 恢复原始状态
+    props.post.isLiked = originalLiked;
+    props.post.likeCount = originalCount;
+    ElMessage.error('点赞操作失败，请重试');
   }
 };
 
@@ -277,10 +309,10 @@ const handleFollow = () => {
 // 处理收藏
 const handleCollect = () => {
   isCollected.value = !isCollected.value;
-  collectionCount.value = isCollected.value 
-    ? collectionCount.value + 1 
+  collectionCount.value = isCollected.value
+    ? collectionCount.value + 1
     : Math.max(0, collectionCount.value - 1);
-  
+
   ElMessage.success(isCollected.value ? '收藏成功' : '已取消收藏');
 };
 
@@ -295,29 +327,78 @@ const handleShare = () => {
 // 加载评论
 const loadComments = async (reset = false) => {
   if (loading.value) return;
-  
+
   try {
     loading.value = true;
-    
+
     if (reset) {
       commentPage.value = 1;
       comments.value = [];
     }
-    
-    const res = await getPostComments(props.post.id, {
-      page: commentPage.value,
-      pageSize: commentPageSize.value
-    });
-    
-    if (res.code === 200) {
-      if (reset) {
-        comments.value = res.data.list;
-      } else {
-        comments.value = [...comments.value, ...res.data.list];
+
+    const res = await getCommentList(props.post.id);
+
+    if (res.code === 200 && res.data && res.data.length > 0) {
+      // 获取所有评论的用户ID
+      const userIds = [...new Set(res.data.map(comment => comment.userId))];
+
+      // 批量获取用户信息
+      let userInfoMap = {};
+      try {
+        const userInfoRes = await batchGetUserInfo(userIds);
+        if (userInfoRes.code === 200) {
+          // API返回的数据格式是 { "1": { nickname: "张三", ... }, "2": { ... } }
+          userInfoMap = userInfoRes.data || {};
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
       }
-      
-      hasMoreComments.value = comments.value.length < res.data.total;
-      commentPage.value++;
+
+      // 处理评论数据，确保字段名一致
+      const processedComments = await Promise.all(res.data.map(async comment => {
+        const userInfo = userInfoMap[comment.userId] || {};
+
+        // 获取评论点赞状态
+        let isLiked = false;
+        try {
+          const likeRes = await getLikeStatus(comment.commentId, 1); // 1表示评论
+          if (likeRes.code === 200) {
+            isLiked = likeRes.data.liked || false;
+          }
+        } catch (error) {
+          console.error(`获取评论 ${comment.commentId} 点赞状态失败:`, error);
+        }
+
+        return {
+          id: comment.commentId,
+          postId: comment.postId,
+          userId: comment.userId,
+          username: userInfo.nickname || `用户${comment.userId}`,
+          userAvatar: userInfo.avatarUrl || 'https://via.placeholder.com/40',
+          authStatus: userInfo.authStatus || 0,
+          content: comment.content,
+          createTime: comment.createdAt,
+          likeCount: comment.likeNum || 0,
+          commentCount: comment.commentNum || 0,
+          isLiked,
+          replies: []
+        };
+      }));
+
+      if (reset) {
+        comments.value = processedComments;
+      } else {
+        comments.value = [...comments.value, ...processedComments];
+      }
+
+      // 暂时不支持分页，所以没有更多评论
+      hasMoreComments.value = false;
+    } else {
+      // 没有评论数据
+      if (reset) {
+        comments.value = [];
+      }
+      hasMoreComments.value = false;
     }
   } catch (error) {
     console.error('获取评论失败:', error);
@@ -341,73 +422,99 @@ const handleReply = (comment) => {
 // 处理评论点赞
 const handleCommentLike = async (commentId) => {
   try {
-    // 调用评论点赞API
-    // 暂时使用模拟数据
     const targetComment = comments.value.find(c => c.id === commentId);
-    if (targetComment) {
-      targetComment.isLiked = !targetComment.isLiked;
-      targetComment.likeCount = targetComment.isLiked
-        ? targetComment.likeCount + 1
-        : Math.max(0, targetComment.likeCount - 1);
+    if (!targetComment) return;
+
+    // 先保存原始状态，用于失败时恢复
+    const originalLiked = targetComment.isLiked;
+    const originalCount = targetComment.likeCount || 0;
+
+    // 立即更新UI，提高响应速度
+    targetComment.isLiked = !targetComment.isLiked;
+    targetComment.likeCount = targetComment.isLiked ? originalCount + 1 : Math.max(0, originalCount - 1);
+
+    // 调用点赞切换API (targetType: 1表示评论)
+    const response = await toggleLike(commentId, 1);
+
+    if (response.code === 200) {
+      // 使用服务器返回的正确数据更新UI
+      targetComment.isLiked = response.data.liked;
+      targetComment.likeCount = response.data.likeCount;
+      console.log('评论点赞状态已更新:', response.data);
+    } else {
+      // 如果请求失败，恢复原始状态
+      targetComment.isLiked = originalLiked;
+      targetComment.likeCount = originalCount;
+      ElMessage.error('点赞操作失败: ' + response.message);
     }
   } catch (error) {
     console.error('评论点赞失败:', error);
-    ElMessage.error('操作失败，请重试');
+    // 恢复原始状态
+    const targetComment = comments.value.find(c => c.id === commentId);
+    if (targetComment) {
+      targetComment.isLiked = originalLiked;
+      targetComment.likeCount = originalCount;
+    }
+    ElMessage.error('点赞操作失败，请重试');
   }
 };
 
 // 提交评论
 const submitComment = async () => {
   if (!commentText.value.trim()) return;
-  
+
   try {
-    // 根据是否有replyTo构建不同的评论对象
-    const comment = {
-      postId: props.post.id,
-      content: commentText.value.trim(),
-      // 如果是回复评论，则添加评论ID
-      ...(replyTo.value ? { parentId: replyTo.value.id } : {})
+    // 获取动态ID，兼容不同的字段名
+    const postIdValue = props.post.postId || props.post.id;
+
+    if (!postIdValue) {
+      ElMessage.error('无法获取动态ID，评论失败');
+      return;
+    }
+
+    // 初始化评论数据
+    let commentData = {
+      postId: postIdValue,
+      content: commentText.value.trim()
     };
-    
-    // 添加评论的模拟数据
-    const newComment = {
-      id: Date.now(),
-      postId: props.post.id,
-      content: commentText.value.trim(),
-      createTime: new Date().toISOString(),
-      userId: 10001, // 模拟当前用户ID
-      username: '当前用户', // 模拟当前用户名
-      userAvatar: currentUserAvatar.value,
-      likeCount: 0,
-      isLiked: false,
-      replies: []
-    };
-    
+
+    // 处理回复逻辑
     if (replyTo.value) {
-      // 如果是回复评论，则添加到相应评论的回复列表
-      const parentComment = comments.value.find(c => c.id === replyTo.value.id);
-      if (parentComment) {
-        parentComment.replies = parentComment.replies || [];
-        parentComment.replies.unshift({
-          ...newComment,
-          replyTo: replyTo.value.username
-        });
+      commentData.parentCommentId = replyTo.value.id;
+
+      // 添加@用户名到评论内容（如果还没有的话）
+      if (!commentData.content.includes(`@${replyTo.value.username}`)) {
+        commentData.content = `@${replyTo.value.username} ${commentData.content}`;
       }
     } else {
-      // 否则添加为顶级评论
-      comments.value.unshift(newComment);
+      // 直接评论动态
+      commentData.parentCommentId = '-1';
     }
-    
-    // 更新评论计数
-    if (props.post.commentCount !== undefined) {
-      props.post.commentCount += 1;
+
+    console.log('发送评论数据:', commentData);
+
+    const response = await addComment(commentData);
+
+    if (response.code === 200) {
+      ElMessage.success('评论成功');
+
+      // 重新加载评论列表
+      await loadComments(true);
+
+      // 更新评论计数
+      if (props.post.commentCount !== undefined) {
+        props.post.commentCount += 1;
+      }
+
+      // 通知父组件评论成功
+      emit('comment', props.post.id);
+    } else {
+      ElMessage.error('评论失败: ' + response.message);
     }
-    
+
     // 清空评论输入框和回复状态
     commentText.value = '';
     replyTo.value = null;
-    
-    ElMessage.success('评论成功');
   } catch (error) {
     console.error('评论失败:', error);
     ElMessage.error('评论失败，请重试');
@@ -436,9 +543,6 @@ onMounted(() => {
   if (props.visible) {
     loadComments(true);
   }
-  
-  // 为了演示，假设收藏计数
-  collectionCount.value = Math.floor(Math.random() * 20);
 });
 
 // 监听visible变化
@@ -450,35 +554,81 @@ watch(() => props.visible, (newVisible) => {
 </script>
 
 <style scoped>
+/* 全屏遮罩层 */
+.xhs-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .xhs-post-detail-container {
   display: flex;
-  width: 100%;
-  height: 100%;
+  width: 90vw;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: 800px;
   background-color: #fff;
   position: relative;
-  border-radius: 8px;
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .close-button {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #666;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 10;
-  transition: all 0.2s;
+  z-index: 1000000;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .close-button:hover {
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(255, 255, 255, 1);
+  color: #333;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* 左侧媒体区域 */
@@ -640,76 +790,72 @@ watch(() => props.visible, (newVisible) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 0;
+  padding: 40px 20px;
   color: #999;
 }
 
 .no-comments i {
   font-size: 32px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .load-more {
   text-align: center;
-  padding: 12px 0;
+  padding: 16px 0;
 }
 
 /* 评论输入框 */
 .comment-input-wrapper {
   display: flex;
   align-items: flex-start;
+  gap: 12px;
   margin-top: 16px;
-  position: relative;
   padding-top: 16px;
   border-top: 1px solid #f0f0f0;
 }
 
 .comment-input-container {
-  position: relative;
-  margin-left: 12px;
   flex: 1;
+  position: relative;
 }
 
 .comment-input {
   width: 100%;
-  height: 36px;
+  padding: 12px;
   border: 1px solid #e0e0e0;
-  border-radius: 18px;
-  padding: 0 80px 0 16px;
-  outline: none;
+  border-radius: 8px;
   font-size: 14px;
-  transition: border-color 0.3s;
+  resize: none;
+  outline: none;
+  transition: border-color 0.3s ease;
 }
 
 .comment-input:focus {
   border-color: #1677ff;
 }
 
-.send-btn {
-  position: absolute;
-  right: 4px;
-  top: 4px;
-  border-radius: 16px;
-}
-
 .reply-badge {
-  position: absolute;
-  top: -20px;
-  left: 8px;
+  background-color: #f0f7ff;
+  color: #1677ff;
+  padding: 4px 8px;
+  border-radius: 4px;
   font-size: 12px;
-  color: #666;
-  display: flex;
-  align-items: center;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: inline-block;
 }
 
-.reply-badge i {
-  margin-left: 4px;
-  cursor: pointer;
+.send-btn {
+  margin-top: 8px;
 }
 
 /* 移动端样式 */
 .is-mobile {
   flex-direction: column;
+  width: 95vw;
+  height: 90vh;
+  max-width: none;
+  max-height: none;
 }
 
 .is-mobile .media-section,
@@ -718,10 +864,87 @@ watch(() => props.visible, (newVisible) => {
 }
 
 .is-mobile .media-section {
-  height: 50vh;
+  height: 60vh;
+  min-height: 300px;
 }
 
 .is-mobile .content-section {
-  max-height: 50vh;
+  height: 40vh;
+  max-height: none;
+  padding: 16px;
+}
+
+.is-mobile .close-button {
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+}
+
+/* 移动端遮罩层调整 */
+@media (max-width: 768px) {
+  .xhs-modal-overlay {
+    padding: 10px;
+  }
+
+  .xhs-post-detail-container {
+    width: 95vw;
+    height: 90vh;
+    border-radius: 12px;
+  }
+}
+
+/* Element Plus 组件样式覆盖 */
+:deep(.el-carousel__indicator) {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+:deep(.el-carousel__indicator.is-active) {
+  background-color: #fff;
+}
+
+:deep(.el-carousel__arrow) {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+}
+
+:deep(.el-carousel__arrow:hover) {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* 滚动条样式 */
+.content-section::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content-section::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.content-section::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.content-section::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.comments-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.comments-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.comments-list::-webkit-scrollbar-thumb {
+  background: #e0e0e0;
+  border-radius: 2px;
+}
+
+.comments-list::-webkit-scrollbar-thumb:hover {
+  background: #c0c0c0;
 }
 </style>

@@ -104,3 +104,37 @@ export const getAllUsers = async () => {
     return { code: 500, message: '获取用户列表失败，请检查网络连接', data: [] };
   }
 }
+
+/**
+ * 上传校园卡认证信息
+ * @param {Object} data 包含校园卡照片URL (beforeCardUrl和afterCardUrl)
+ * @returns {Promise} 返回认证结果
+ */
+export const uploadStudentCard = async (data) => {
+  try {
+    const token = localStorage.getItem('token');
+    console.log('提交校园卡认证信息:', data);
+    
+    const response = await axios.post(`${baseURL}/uploadCard`, data, {
+      headers: {
+        'Content-Type': 'application/json',
+        'token': token
+      }
+    });
+    
+    if (response.data && response.data.code === 200) {
+      console.log('校园卡认证信息提交成功:', response.data);
+      return response.data;
+    } else {
+      console.warn('校园卡认证信息提交失败:', response.data);
+      return response.data || { code: 500, message: '校园卡认证提交失败', data: null };
+    }
+  } catch (error) {
+    console.error('校园卡认证信息提交失败:', error);
+    return { 
+      code: 500, 
+      message: '校园卡认证提交失败，请检查网络连接', 
+      data: null 
+    };
+  }
+}

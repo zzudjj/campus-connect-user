@@ -4,6 +4,7 @@ import FeedPage from '../views/FeedPage.vue';
 import UserProfile from '../views/UserProfile.vue';
 import FriendsPage from '../views/FriendsPage.vue';
 import ChatPage from '../views/ChatPage.vue';
+import VerificationPage from '../views/VerificationPage.vue';
 
 const routes = [
   {
@@ -34,6 +35,12 @@ const routes = [
       }
       // 这里可继续添加其它主内容区页面
     ]
+  },
+  // 校园卡认证页面 - 独立页面不包含顶栏和侧边栏
+  {
+    path: '/verification',
+    name: 'Verification',
+    component: VerificationPage
   }
 ];
 
