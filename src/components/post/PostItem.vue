@@ -1,5 +1,16 @@
 <template>
   <el-card class="post-item" shadow="hover">
+    <!-- 三点菜单 - 放在卡片内部右上角 -->
+    <div class="post-menu">
+      <el-dropdown trigger="click" @command="handleMoreAction">
+        <i class="fas fa-ellipsis-h"></i>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="report">举报</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
     <!-- 用户信息区 -->
     <div class="post-header">
       <el-avatar :src="post.userAvatar" :size="44" />
@@ -104,6 +115,45 @@
     </div>
   </el-card>
   
+  <!-- 举报弹窗 -->
+  <el-dialog
+    v-model="showReportDialog"
+    title="举报内容"
+    width="30%"
+    destroy-on-close
+    append-to-body
+  >
+    <div class="report-dialog">
+      <p class="report-title">请选择举报原因</p>
+      <el-radio-group v-model="reportReason">
+        <el-radio label="垃圾广告">垃圾广告</el-radio>
+        <el-radio label="色情内容">色情内容</el-radio>
+        <el-radio label="违法有害信息">违法有害信息</el-radio>
+        <el-radio label="骗局信息">骗局信息</el-radio>
+        <el-radio label="骚扰行为">骚扰行为</el-radio>
+        <el-radio label="其他">其他</el-radio>
+      </el-radio-group>
+      
+      <el-input
+        v-if="reportReason === '其他'"
+        v-model="customReason"
+        type="textarea"
+        :rows="3"
+        placeholder="请详细描述举报原因"
+        maxlength="200"
+        show-word-limit
+      />
+    </div>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="showReportDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitReport" :disabled="!reportReason">
+          提交举报
+        </el-button>
+      </span>
+    </template>
+  </el-dialog>
+  
 <!-- 视频预览组件，使用teleport确保不影响页面布局 -->
 <teleport to="body">
   <div v-if="showVideoViewer" class="video-viewer-container">
@@ -151,6 +201,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
+import { submitReport as apiSubmitReport } from '@/api/report';
 
 const props = defineProps({ post: { type: Object, required: true } });
 const emit = defineEmits(['like', 'comment', 'follow']);
@@ -158,6 +209,57 @@ const showFullContent = ref(false);
 const maxContentLen = 80;
 const shortContent = computed(() => props.post.content.length > maxContentLen ? props.post.content.slice(0, maxContentLen) : props.post.content);
 const isLongContent = computed(() => props.post.content.length > maxContentLen);
+
+// 举报相关状态
+const showReportDialog = ref(false);
+const reportReason = ref('');
+const customReason = ref('');
+const reportType = ref(1); // 目标类型：1为动态
+
+// 处理菜单选项
+const handleMoreAction = (command) => {
+  if (command === 'report') {
+    showReportDialog.value = true;
+    reportReason.value = ''; // 重置举报原因
+    customReason.value = ''; // 重置自定义原因
+  }
+};
+
+// 提交举报
+const submitReport = async () => {
+  try {
+    // 确定最终的举报原因
+    const reason = reportReason.value === '其他' ? customReason.value : reportReason.value;
+    
+    if (reportReason.value === '其他' && !customReason.value.trim()) {
+      ElMessage.warning('请输入举报原因');
+      return;
+    }
+    
+    // 确保targetId是整数
+    const targetId = parseInt(props.post.id);
+    if (isNaN(targetId)) {
+      ElMessage.error('目标ID无效');
+      return;
+    }
+    
+    const response = await apiSubmitReport(targetId, reportType.value, reason);
+    
+    if (response.code === 200) {
+      ElMessage.success('举报成功，我们会尽快处理');
+      showReportDialog.value = false;
+    } else {
+      ElMessage.error(response.message || '举报失败，请稍后再试');
+    }
+  } catch (error) {
+    console.error('提交举报错误:', error);
+    if (error.response && error.response.data && error.response.data.message) {
+      ElMessage.error(error.response.data.message);
+    } else {
+      ElMessage.error('网络错误，请稍后再试');
+    }
+  }
+};
 
 // 视频相关
 const showVideoViewer = ref(false);
@@ -271,6 +373,7 @@ function formatTime(time) {
   box-shadow: 0 3px 12px 0 rgba(0,0,0,0.06);
   padding: 0;
   width: 100%;
+  position: relative;
 }
 
 .post-header {
@@ -493,6 +596,30 @@ function formatTime(time) {
   padding: 0 4px;
   border-radius: 2px;
   display: none; /* 默认隐藏调试信息 */
+}
+
+/* 三点菜单样式 */
+.post-menu {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.post-menu:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.post-menu i {
+  font-size: 16px;
+  color: #606266;
 }
 
 /* 视频预览器样式 - 完全自定义以避免影响页面其他元素 */

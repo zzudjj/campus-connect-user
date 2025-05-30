@@ -3,7 +3,7 @@
   <div class="layout-root">
     <SideBar />
     <div class="layout-main">
-      <HeaderBar v-if="$route.name === 'Feed'" :center-search="true" />
+      <HeaderBar v-if="$route.name === 'Feed' || $route.name === 'Notification'" :center-search="$route.name === 'Feed'" />
       <div class="main-flex">
         <div class="main-content">
           <router-view v-slot="{ Component }">
@@ -12,7 +12,10 @@
         </div>
         <HotList v-if="$route.name === 'Feed' && !isLoading" class="main-hotlist" />
       </div>
-      <FloatButtonGroup @create-post="showPostModal = true" />
+      <FloatButtonGroup 
+        @create-post="showPostModal = true" 
+        @refresh="handleRefresh" 
+      />
       
       <!-- 发布动态弹窗 -->
       <PostModal
@@ -49,13 +52,20 @@ const showPostModal = ref(false); // 控制发布动态弹窗的显示
 const showCommentModal = ref(false); // 控制评论弹窗的显示
 const currentCommentPost = ref(null); // 当前评论的帖子
 
+// 处理刷新事件
+const handleRefresh = () => {
+  // 通过自定义事件通知相关组件进行刷新
+  document.dispatchEvent(new CustomEvent('refresh-feed-list'));
+};
+
 // 处理发布动态成功事件
 const handlePostSuccess = () => {
   showPostModal.value = false;
   // 如果当前页面是动态页，则刷新数据
   if (route.name === 'Feed') {
-    // 刷新动态数据...
-    // 这里可以添加更多逻辑，比如触发FeedPage组件的刷新方法
+    // 触发刷新动态列表事件
+    handleRefresh();
+    // 这里可以添加更多逻辑，比如更新缓存或其他UI状态
   }
 }
 

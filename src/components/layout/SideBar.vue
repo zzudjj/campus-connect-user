@@ -11,7 +11,7 @@
         @click="router.push('/')"
       >
         <el-icon><i-ep-house /></el-icon>
-        <span>推荐</span>
+        <span>动态</span>
       </div>
       
       <!-- 好友选项 -->

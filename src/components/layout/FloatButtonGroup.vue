@@ -3,10 +3,10 @@
     <button class="fab-btn fab-main" title="发布" @click="emit('create-post')">
       <el-icon><Edit /></el-icon>
     </button>
-    <button class="fab-btn fab-sub" title="刷新">
+    <button class="fab-btn fab-sub" title="刷新" @click="handleRefresh">
       <el-icon><Refresh /></el-icon>
     </button>
-    <button class="fab-btn fab-sub" title="回到顶部">
+    <button class="fab-btn fab-sub" title="回到顶部" @click="scrollToTop">
       <el-icon><Top /></el-icon>
     </button>
   </div>
@@ -15,7 +15,52 @@
 <script setup>
 import { Edit, Refresh, Top } from '@element-plus/icons-vue';
 
-const emit = defineEmits(['create-post']);
+const emit = defineEmits(['create-post', 'refresh']);
+
+// 刷新内容
+ const handleRefresh = () => {
+  // 触发刷新事件，由父组件来处理具体刷新逻辑
+  emit('refresh');
+  // 触发全局事件，确保所有需要刷新的组件都能响应
+  document.dispatchEvent(new CustomEvent('refresh-feed-list'));
+};
+
+// 回到顶部
+const scrollToTop = () => {
+  // 浏览器兼容性处理
+  try {
+    // 获取内容区域元素 - 这是主要的滚动容器
+    const mainContent = document.querySelector('.main-content');
+    
+    if (mainContent) {
+      // 直接设置滚动位置，避免scrollTo兼容性问题
+      mainContent.scrollTop = 0;
+      
+      // 如果浏览器支持平滑滚动，则使用平滑滚动
+      if ('scrollBehavior' in document.documentElement.style) {
+        mainContent.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }
+      
+      // 触发自定义事件，通知其他可能需要响应的组件
+      document.dispatchEvent(new CustomEvent('scroll-to-top'));
+      
+      return; // 已处理完毕，不需要继续
+    }
+    
+    // 如果没有找到内容区域，则回退到滚动整个页面
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (error) {
+    // 兼容模式：如果上述方法失败，尝试最简单的方式
+    try {
+      window.scrollTo(0, 0);
+    } catch (e) {
+      console.error('滚动到顶部失败:', e);
+    }
+  }
+};
 </script>
 
 <style scoped>

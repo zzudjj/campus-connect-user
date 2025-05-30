@@ -85,6 +85,17 @@
                 >
                   <i class="far fa-paper-plane"></i> 回复
                 </el-button>
+                
+                <!-- 举报按钮 -->
+                <el-button
+                  class="comment-action"
+                  type="default"
+                  size="small"
+                  text
+                  @click="handleReport(comment, 2)" 
+                >
+                  <i class="far fa-flag"></i> 举报
+                </el-button>
               </div>
             </div>
           </div>
@@ -138,6 +149,17 @@
                   @click="handleReplyToComment(reply)"
                 >
                   <i class="far fa-paper-plane"></i> 回复
+                </el-button>
+                
+                <!-- 举报按钮 -->
+                <el-button
+                  class="comment-action"
+                  type="default"
+                  size="small"
+                  text
+                  @click="handleReport(reply, 2)" 
+                >
+                  <i class="far fa-flag"></i> 举报
                 </el-button>
               </div>
             </div>
@@ -198,6 +220,47 @@
         </el-button>
       </div>
     </div>
+    
+    <!-- 举报弹窗 -->
+    <el-dialog
+      v-model="showReportDialog"
+      title="举报内容"
+      width="30%"
+      destroy-on-close
+      append-to-body
+    >
+      <div class="report-dialog">
+        <p class="report-title">请选择举报原因</p>
+        <el-radio-group v-model="reportReason">
+          <el-radio label="垃圾广告">垃圾广告</el-radio>
+          <el-radio label="色情内容">色情内容</el-radio>
+          <el-radio label="违法有害信息">违法有害信息</el-radio>
+          <el-radio label="骗局信息">骗局信息</el-radio>
+          <el-radio label="骚扰行为">骚扰行为</el-radio>
+          <el-radio label="其他">其他</el-radio>
+        </el-radio-group>
+        
+        <el-input
+          v-if="reportReason === '其他'"
+          v-model="customReason"
+          type="textarea"
+          :rows="3"
+          placeholder="请详细描述举报原因"
+          maxlength="200"
+          show-word-limit
+          class="custom-reason-input"
+        />
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showReportDialog = false">取消</el-button>
+          <el-button type="primary" @click="submitReport" :disabled="!reportReason || submittingReport">
+            <span v-if="!submittingReport">提交举报</span>
+            <el-icon v-else class="is-loading"><Loading /></el-icon>
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -207,6 +270,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Close, ArrowLeft, Loading, Delete } from '@element-plus/icons-vue';
 import { addComment, getCommentList, getCommentReplies, deleteComment, batchGetUserInfo, getAllCommentReplies } from '../../api/comment';
 import { toggleLike, getLikeStatus } from '../../api/like';
+import { submitReport as apiSubmitReport } from '../../api/report';
 import { syncService } from '../../services/SyncService.js';
 
 const props = defineProps({
@@ -223,6 +287,14 @@ const commentText = ref('');
 const initialCommentCount = ref(0); // 用于记录动态原始评论数
 const currentUserAvatar = ref('https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png');
 const currentUserId = ref(localStorage.getItem('userId') || null);
+
+// 举报相关状态
+const showReportDialog = ref(false);
+const reportReason = ref('');
+const customReason = ref('');
+const reportTarget = ref(null); // 要举报的评论对象
+const reportType = ref(2); // 目标类型：2代表评论
+const submittingReport = ref(false);
 
 // 评论数据
 const commentCount = ref(0); // 评论总数
@@ -671,6 +743,58 @@ const closeModal = () => {
   activeRootComment.value = null;
   replyToComment.value = null;
   emit('close');
+};
+
+// 处理举报按钮点击
+const handleReport = (target, type) => {
+  reportTarget.value = target;
+  reportType.value = type || 2; // 评论类型默认为2
+  reportReason.value = '';
+  customReason.value = '';
+  showReportDialog.value = true;
+};
+
+// 提交举报
+const submitReport = async () => {
+  try {
+    // 确定最终的举报原因
+    const reason = reportReason.value === '其他' ? customReason.value : reportReason.value;
+    
+    if (reportReason.value === '其他' && !customReason.value.trim()) {
+      ElMessage.warning('请输入举报原因');
+      return;
+    }
+    
+    submittingReport.value = true;
+    
+    // 确保 targetId 是整数类型
+    const targetId = parseInt(reportTarget.value.commentId || reportTarget.value.id);
+    if (isNaN(targetId)) {
+      ElMessage.error('目标ID无效');
+      submittingReport.value = false;
+      return;
+    }
+    
+    // 使用统一的API函数
+    const response = await apiSubmitReport(targetId, reportType.value, reason);
+    
+    submittingReport.value = false;
+    
+    if (response.code === 200) {
+      ElMessage.success('举报成功，我们会尽快处理');
+      showReportDialog.value = false;
+    } else {
+      ElMessage.error(response.message || '举报失败，请稍后再试');
+    }
+  } catch (error) {
+    submittingReport.value = false;
+    console.error('提交举报错误:', error);
+    if (error.response && error.response.data && error.response.data.message) {
+      ElMessage.error(error.response.data.message);
+    } else {
+      ElMessage.error('网络错误，请稍后再试');
+    }
+  }
 };
 
 // 获取当前用户头像

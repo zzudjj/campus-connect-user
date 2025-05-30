@@ -394,3 +394,298 @@ export const getPostComments = (postId, params) => {
     }, 300)
   })
 }
+
+/**
+ * 获取前五个最热门动态简要信息
+ * @returns {Promise} 返回热门动态列表
+ */
+export const getTopHotBrief = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'token': token } : {};
+    
+    const response = await axios.get(`${baseURL}/post/topHotBrief`, { headers });
+    
+    if (response.data.code === 200) {
+      // 处理数据，确保热度分数只保留一位小数
+      const posts = response.data.data.map(post => ({
+        ...post,
+        hotScore: Number(post.hotScore).toFixed(1)
+      }));
+      
+      return {
+        code: 200,
+        data: posts,
+        message: '获取成功'
+      };
+    } else {
+      throw new Error(response.data.message || '获取热门动态失败');
+    }
+  } catch (error) {
+    console.error('获取热门动态失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 获取热门动态列表
+ * @param {Number} start 起始位置，默认为0
+ * @param {Number} postNum 获取条数，默认为15
+ * @returns {Promise} 返回热门动态ID列表
+ */
+export const getHotPosts = async (start = 0, postNum = 5) => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'token': token } : {};
+    
+    const response = await axios.get(`${baseURL}/post/hot`, {
+      params: {
+        start,
+        PostNum: postNum
+      },
+      headers
+    });
+    
+    if (response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data.message || '获取热门动态失败');
+    }
+  } catch (error) {
+    console.error('获取热门动态失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 获取最新动态列表
+ * @param {Number} start 起始位置，默认为0
+ * @param {Number} postNum 获取条数，默认为15
+ * @returns {Promise} 返回最新动态ID列表
+ */
+export const getNewPosts = async (start = 0, postNum = 5) => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'token': token } : {};
+    
+    const response = await axios.get(`${baseURL}/post/new`, {
+      params: {
+        start,
+        PostNum: postNum
+      },
+      headers
+    });
+    
+    if (response.data.code === 200) {
+      return response.data;
+    } else {
+      throw new Error(response.data.message || '获取最新动态失败');
+    }
+  } catch (error) {
+    console.error('获取最新动态失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 批量获取动态详情
+ * @param {Array<Number>} postIds 动态ID数组
+ * @returns {Promise} 返回动态详情列表
+ */
+export const getPostsByIds = async (postIds) => {
+  try {
+    if (!postIds || !Array.isArray(postIds) || postIds.length === 0) {
+      return {
+        code: 200,
+        data: [],
+        message: '无效的动态ID列表'
+      };
+    }
+    
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'token': token } : {})
+    };
+    
+    try {
+      // 尝试使用批量API
+      const response = await axios.post(`${baseURL}/post/byIds`, postIds, { headers });
+      
+      if (response.data.code === 200) {
+        // 获取到动态ID列表，然后使用原始实现样式获取每个动态的媒体和用户信息
+        const rawPosts = response.data.data;
+        console.log('原始动态详情:', rawPosts);
+        
+        // 对每个动态进行处理，补充缺失的媒体和用户信息
+        const postsPromises = rawPosts.map(async (post) => {
+          try {
+            // 安全地获取媒体文件和用户信息
+            let mediaResponse = { code: 200, data: [] };
+            let userResponse = { code: 200, data: {} };
+            
+            try {
+              // 尝试获取媒体文件
+              mediaResponse = await getPostMedia(post.postId || post.id);
+              console.log(`获取动态 ${post.postId || post.id} 的媒体成功:`, mediaResponse);
+            } catch (mediaError) {
+              console.error(`获取动态 ${post.postId || post.id} 的媒体文件失败:`, mediaError);
+            }
+            
+            try {
+              // 尝试获取用户信息
+              const userApi = await import('../api/user');
+              userResponse = await userApi.getUserPublicProfile(post.userId);
+              console.log(`获取用户 ${post.userId} 的信息成功:`, userResponse);
+            } catch (userError) {
+              console.error(`获取用户 ${post.userId} 的信息失败:`, userError);
+            }
+            
+            // 获取媒体文件，并按照sortOrder排序
+            const mediaFiles = mediaResponse.code === 200 ? mediaResponse.data : [];
+            
+            // 按sortOrder排序
+            mediaFiles.sort((a, b) => a.sortOrder - b.sortOrder);
+            
+            // 处理媒体文件，区分图片和视频
+            const processedMedia = mediaFiles.map(media => {
+              // 添加对媒体类型的处理
+              let mediaUrl = media.mediaUrl;
+              let thumbnailUrl = null;
+              
+              // 媒体URL无效时的处理
+              if (!mediaUrl || mediaUrl.includes('example-cos.com')) {
+                // 图片使用随机占位图
+                if (media.mediaType === 0) {
+                  mediaUrl = `https://picsum.photos/id/${((post.postId || post.id) * 10 + media.sortOrder) % 100}/400/300`;
+                } 
+                // 视频使用默认占位图
+                else if (media.mediaType === 1) {
+                  mediaUrl = 'https://example-video-url.mp4'; // 默认值，实际应该不会被使用
+                }
+              }
+              
+              // 处理视频缩略图
+              if (media.mediaType === 1) {
+                thumbnailUrl = media.backgroundUrl || 'https://picsum.photos/id/36/400/300';
+              }
+              
+              return {
+                url: mediaUrl,
+                type: media.mediaType, // 0为图片，1为视频
+                thumbnailUrl: thumbnailUrl,
+                sortOrder: media.sortOrder
+              };
+            });
+            
+            // 获取用户信息
+            const userData = userResponse.code === 200 ? userResponse.data : {};
+            
+            // 构建完整的动态信息
+            return {
+              ...post,
+              id: post.postId || post.id,
+              postId: post.postId || post.id,
+              username: userData.nickname || post.username || '用户',
+              userAvatar: userData.avatarUrl || post.userAvatar || 'https://picsum.photos/id/64/100/100',
+              authStatus: userData.authStatus || post.authStatus || 0,
+              likeCount: post.likeNum || post.likeCount || 0,
+              commentCount: post.commentNum || post.commentCount || 0,
+              createTime: post.createdAt || post.createTime,
+              media: processedMedia
+            };
+          } catch (error) {
+            console.error(`处理动态 ${post.postId || post.id} 时出错:`, error);
+            return post; // 出错时返回原始动态
+          }
+        });
+        
+        const enhancedPosts = await Promise.all(postsPromises);
+        console.log('增强后的动态列表:', enhancedPosts);
+        
+        return {
+          code: 200,
+          data: enhancedPosts,
+          message: 'success'
+        };
+      }
+    } catch (batchError) {
+      console.warn('批量获取动态详情失败，切换到逐个获取模式:', batchError);
+      // 如果批量API失败，切换到逐个获取模式
+    }
+    
+    // 批量API失败或不存在，逐个获取动态详情
+    console.log('使用逐个获取动态详情');
+    const postsPromises = postIds.map(async id => {
+      try {
+        const response = await axios.get(`${baseURL}/post/${id}`, { headers });
+        if (response.data.code === 200) {
+          const postData = response.data.data;
+          
+          // 获取媒体信息
+          let media = [];
+          try {
+            const mediaResponse = await getPostMedia(id);
+            if (mediaResponse.code === 200) {
+              media = mediaResponse.data.map(item => ({
+                url: item.mediaUrl,
+                type: item.mediaType,
+                thumbnailUrl: item.mediaType === 1 ? (item.backgroundUrl || 'https://picsum.photos/id/36/400/300') : null,
+                sortOrder: item.sortOrder
+              }));
+              media.sort((a, b) => a.sortOrder - b.sortOrder);
+            }
+          } catch (error) {
+            console.error(`获取动态 ${id} 的媒体失败:`, error);
+          }
+          
+          // 获取用户信息
+          let username = postData.username || '用户';
+          let userAvatar = postData.userAvatar || 'https://picsum.photos/id/64/100/100';
+          let authStatus = postData.authStatus || 0;
+          
+          try {
+            const userApi = await import('../api/user');
+            const userResponse = await userApi.getUserPublicProfile(postData.userId);
+            if (userResponse.code === 200) {
+              username = userResponse.data.nickname || username;
+              userAvatar = userResponse.data.avatarUrl || userAvatar;
+              authStatus = userResponse.data.authStatus || authStatus;
+            }
+          } catch (error) {
+            console.error(`获取用户 ${postData.userId} 信息失败:`, error);
+          }
+          
+          return {
+            ...postData,
+            id: postData.id || id,
+            postId: postData.id || id,
+            username: username,
+            userAvatar: userAvatar,
+            authStatus: authStatus,
+            likeCount: postData.likeCount || postData.likeNum || 0,
+            commentCount: postData.commentCount || postData.commentNum || 0,
+            createTime: postData.createdAt || postData.createTime,
+            media: media
+          };
+        }
+        return null;
+      } catch (err) {
+        console.error(`获取动态 ${id} 失败:`, err);
+        return null;
+      }
+    });
+    
+    const posts = await Promise.all(postsPromises);
+    const validPosts = posts.filter(post => post !== null);
+    
+    return {
+      code: 200,
+      data: validPosts,
+      message: 'success'
+    };
+  } catch (error) {
+    console.error('批量获取动态详情失败:', error);
+    throw error;
+  }
+}
