@@ -44,6 +44,20 @@
         <el-icon><i-ep-user /></el-icon>
         <span>我的</span>
       </div>
+      
+      <!-- 分隔线 -->
+      <div class="sidebar-divider"></div>
+      
+      <!-- 通知选项 -->
+      <div
+        class="nav-item"
+        :class="{ active: route.path === '/notification' }"
+        @click="router.push('/notification')"
+      >
+        <el-icon><i-ep-bell /></el-icon>
+        <span>通知</span>
+        <el-badge v-if="unreadNotificationCount > 0" :value="unreadNotificationCount" class="notification-badge" />
+      </div>
     </nav>
   </aside>
 </template>
@@ -51,13 +65,16 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { House, User, UserFilled, ChatDotRound } from '@element-plus/icons-vue';
+import { House, User, UserFilled, ChatDotRound, Bell } from '@element-plus/icons-vue';
 import { getConversations } from '../../api/chat';
+import { getUnreadCount } from '../../api/notification';
+import { notificationState, initWebSocket } from '../../services/ChatSocketService';
 
 const route = useRoute();
 const router = useRouter();
 const pendingRequestCount = ref(0);
 const unreadMessageCount = ref(0);
+const unreadNotificationCount = ref(0);
 
 // 获取待处理好友请求数量
 const fetchPendingRequestCount = async () => {
@@ -90,13 +107,54 @@ const fetchUnreadMessageCount = async () => {
   }
 };
 
+// 获取未读通知数量
+const fetchUnreadNotificationCount = async () => {
+  try {
+    // 优先使用WebSocket状态中的数据
+    if (notificationState.unreadCount > 0) {
+      unreadNotificationCount.value = notificationState.unreadCount;
+      return;
+    }
+    
+    // 如果WebSocket没有数据，则使用API获取
+    const data = await getUnreadCount();
+    if (data.code === 200) {
+      unreadNotificationCount.value = data.data;
+      notificationState.unreadCount = data.data;
+    }
+  } catch (error) {
+    console.error('获取未读通知数量失败', error);
+  }
+};
+
 let requestTimer;
 let messageTimer;
+
+// 监听通知状态变化
+const setupNotificationWatcher = () => {
+  // 使用watch API监听notificationState.unreadCount变化
+  const unsubscribe = setInterval(() => {
+    if (notificationState.unreadCount !== unreadNotificationCount.value) {
+      unreadNotificationCount.value = notificationState.unreadCount;
+    }
+  }, 1000); // 每秒检查一次状态变化
+  
+  return unsubscribe;
+};
+
+let notificationWatcher;
 
 onMounted(() => {
   // 初始化待处理请求数量和未读消息数量
   fetchPendingRequestCount();
   fetchUnreadMessageCount();
+  fetchUnreadNotificationCount();
+  
+  // 初始化WebSocket连接，开始接收通知
+  initWebSocket();
+  
+  // 设置状态监听
+  notificationWatcher = setupNotificationWatcher();
   
   // 设置定时器，每分钟获取一次待处理请求数量
   requestTimer = setInterval(fetchPendingRequestCount, 60000);
@@ -109,6 +167,10 @@ onBeforeUnmount(() => {
   // 清除定时器
   if (requestTimer) clearInterval(requestTimer);
   if (messageTimer) clearInterval(messageTimer);
+  if (notificationWatcher) clearInterval(notificationWatcher);
+  
+  // 这里不关闭WebSocket连接，因为其他组件可能还在使用
+  // WebSocket连接会在用户登出时由user.js中的logout方法关闭
 });
 </script>
 
@@ -198,5 +260,17 @@ onBeforeUnmount(() => {
 .nav-item:hover {
   background: #e6f4ff;
   color: #1677ff;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background-color: #e6e6e6;
+  margin: 12px 24px;
+  width: 80%;
+}
+
+.notification-badge {
+  position: absolute;
+  right: 24px;
 }
 </style> 

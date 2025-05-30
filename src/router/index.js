@@ -5,6 +5,7 @@ import UserProfile from '../views/UserProfile.vue';
 import FriendsPage from '../views/FriendsPage.vue';
 import ChatPage from '../views/ChatPage.vue';
 import VerificationPage from '../views/VerificationPage.vue';
+import NotificationPage from '../views/NotificationPage.vue';
 
 const routes = [
   {
@@ -32,6 +33,12 @@ const routes = [
         path: 'chat',
         name: 'Chat',
         component: ChatPage
+      },
+      // 通知模块
+      {
+        path: 'notification',
+        name: 'Notification',
+        component: NotificationPage
       }
       // 这里可继续添加其它主内容区页面
     ]

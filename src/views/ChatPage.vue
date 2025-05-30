@@ -370,11 +370,16 @@ router.afterEach((to, from) => {
 
 // 初始化
 onMounted(async () => {
-  // 先尝试断开任何现有连接，完全重置状态
-  chatSocketService.disconnect();
+  console.log('聊天页面挂载，注册聊天消息处理器...');
 
-  // 注册全局事件监听器，确保即使没有正常注册消息处理器也能收到通知
+  // 1. 注册全局事件监听器，用于处理从其他组件分发的消息
   window.addEventListener('ws-chat-message', handleGlobalChatMessage);
+  
+  // 2. 直接在ChatSocketService中注册聊天消息处理器
+  chatSocketService.addMessageHandler('chat', handleChatMessage);
+  
+  // 3. 注册在线状态处理器，用于更新好友在线状态
+  chatSocketService.addMessageHandler('online_status', handleOnlineStatusUpdate);
 
   // 添加智能后台刷新机制，避免打断用户浏览
   const refreshInterval = setInterval(() => {
@@ -388,17 +393,8 @@ onMounted(async () => {
   // 记录定时器以便在组件卸载时清除
   timerRefs.value.push(refreshInterval);
 
-  // 延迟一小段时间再连接，确保断开操作已完成
-  setTimeout(() => {
-    console.log('开始重新初始化WebSocket连接...');
-    // 强制重新初始化WebSocket连接
-    chatSocketService.init();
-
-    // 注册消息处理器
-    chatSocketService.addMessageHandler('chat', handleChatMessage);
-    chatSocketService.addMessageHandler('unread', handleUnreadUpdate);
-    chatSocketService.addMessageHandler('connection', handleConnectionStatus);
-    chatSocketService.addMessageHandler('online_status', handleOnlineStatusUpdate);
+  // 不再注册处理器，因为所有处理器已在App.vue中注册
+  console.log('聊天页面初始化，使用全局WebSocket处理器...');
 
     // 登录后立即刷新会话列表和聊天历史
     setTimeout(() => {
@@ -408,7 +404,7 @@ onMounted(async () => {
         fetchChatHistory();
       }
     }, 1000);
-  }, 500);
+  // }, 500);
 
   // 获取会话列表
   await fetchConversations();
@@ -499,12 +495,12 @@ const handleGlobalChatMessage = (event) => {
 onBeforeUnmount(() => {
   console.log('聊天组件卸载，清理资源...');
 
-  // 移除消息处理器
+  // 移除在ChatSocketService中注册的聊天消息处理器
   chatSocketService.removeMessageHandler('chat', handleChatMessage);
-  chatSocketService.removeMessageHandler('unread', handleUnreadUpdate);
-  chatSocketService.removeMessageHandler('connection', handleConnectionStatus);
+  
+  // 移除在线状态处理器
   chatSocketService.removeMessageHandler('online_status', handleOnlineStatusUpdate);
-
+  
   // 移除全局事件监听器
   window.removeEventListener('ws-chat-message', handleGlobalChatMessage);
 
@@ -721,18 +717,26 @@ const fetchChatHistory = async () => {
 
     const res = await getChatHistory(userId);
     if (res.code === 200) {
-      messages.value = res.data || [];
-
-      // 滚动到底部
+      // 确保按时间排序，最早的在上，最新的在下
+      const sortedMessages = (res.data || []).sort((a, b) => 
+        new Date(a.createdAt) - new Date(b.createdAt)
+      );
+      
+      messages.value = sortedMessages;
+      
+      // 先让加载状态变为完成，这样所有消息都会显示
+      loadingHistory.value = false;
+      
+      // 等待DOM完全更新
       await nextTick();
       scrollToBottom();
     } else {
       ElMessage.error(res.message || '获取聊天历史失败');
+      loadingHistory.value = false;
     }
   } catch (error) {
     console.error('获取聊天历史失败', error);
     ElMessage.error('获取聊天历史失败，请检查网络连接');
-  } finally {
     loadingHistory.value = false;
   }
 };
@@ -923,9 +927,18 @@ const getCurrentFriendOnlineStatus = () => {
 };
 
 // 滚动到底部
-const scrollToBottom = () => {
+const scrollToBottom = (smooth = false) => {
   if (messageListRef.value) {
-    messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
+    try {
+      // 使用现代的 scrollTo API 支持平滑滚动
+      messageListRef.value.scrollTo({
+        top: messageListRef.value.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    } catch (error) {
+      // 兼容旧浏览器
+      messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
+    }
   }
 };
 
@@ -987,8 +1000,41 @@ const formatTime = (timeString) => {
 };
 
 // 处理接收到的消息
-const handleChatMessage = (data) => {
-  console.log('%c收到WebSocket消息:', 'color: blue; font-weight: bold;', data);
+const handleChatMessage = (message) => {
+  console.log('%c收到WebSocket消息:', 'color: blue; font-weight: bold;', message);
+  
+  // 同时支持新旧两种消息格式
+  let data;
+  
+  // 首先确保消息存在且类型正确
+  if (!message || !message.type) {
+    console.warn('收到的消息缺少type属性:', message);
+    return;
+  }
+  
+  // 检查是否是非chat类型消息
+  if (message.type !== 'chat') {
+    console.warn('收到非chat类型消息，已忽略:', message);
+    return;
+  }
+  
+  // 适配新格式（消息内容在data属性中）
+  if (message.data) {
+    console.log('检测到新API格式，消息内容在data属性中');
+    data = message.data;
+  } 
+  // 适配旧格式（消息内容直接在根级别）
+  else if (message.content !== undefined || message.messageId !== undefined) {
+    console.log('检测到旧API格式，消息内容在根级别');
+    data = message; // 消息内容就是整个消息对象
+  }
+  // 无法识别的消息格式
+  else {
+    console.warn('无法识别的消息格式:', message);
+    return;
+  }
+  
+  console.log('最终解析出的消息内容:', data);
 
   // 保存当前滚动位置
   const scrollContainer = messageListRef.value;
@@ -1061,7 +1107,7 @@ const handleChatMessage = (data) => {
 
       // 显示通知
       ElMessage({
-        message: `收到来自 ${data.senderNickname || `用户${data.senderId}`} 的新消息`,
+        message: `收到来自 ${data.senderNickname} 的新消息`,
         type: 'info',
         duration: 3000,
         showClose: true,
@@ -1155,28 +1201,28 @@ const handleOnlineStatusUpdate = (data) => {
 
 // 更新好友在线状态
 const updateFriendsOnlineStatus = async () => {
-  console.log('正在检查好友在线状态...');
+ // console.log('正在检查好友在线状态...');
   if (friendsList.value.length === 0) {
     console.log('好友列表为空，不检查在线状态');
     return;
   }
 
   try {
-    console.log(`开始检查 ${friendsList.value.length} 个好友的在线状态...`);
+    //console.log(`开始检查 ${friendsList.value.length} 个好友的在线状态...`);
 
     for (const friend of friendsList.value) {
       // 正确获取好友ID：使用 otherUserId 字段
       const userId = Number(friend.otherUserId);
-      console.log(`检查用户 ${userId} 的在线状态...`);
+     // console.log(`检查用户 ${userId} 的在线状态...`);
 
       if (!isNaN(userId) && userId > 0) {
-        console.log(`调用 checkUserOnlineStatus API: userId=${userId}`);
+      //  console.log(`调用 checkUserOnlineStatus API: userId=${userId}`);
         const res = await checkUserOnlineStatus(userId);
-        console.log(`检查用户 ${userId} 的在线状态返回结果:`, res);
+       // console.log(`检查用户 ${userId} 的在线状态返回结果:`, res);
 
         if (res.code === 200) {
           friend.online = res.data || false;
-          console.log(`用户 ${userId} 的在线状态是:`, friend.online ? '在线' : '离线');
+          //console.log(`用户 ${userId} 的在线状态是:`, friend.online ? '在线' : '离线');
         }
       } else {
         console.error('更新在线状态时发现无效的用户ID:', friend.otherUserId);

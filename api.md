@@ -51,42 +51,39 @@
   - [10.4 获取点赞状态](#104-获取点赞状态)
   - [10.5 获取点赞数](#105-获取点赞数)
   - [10.6 获取用户点赞列表](#106-获取用户点赞列表)
-- [11. 好友模块](#11-好友模块)
-  - [11.1 发送好友请求](#111-发送好友请求)
-  - [11.2 接受好友请求](#112-接受好友请求)
-  - [11.3 拒绝好友请求](#113-拒绝好友请求)
-  - [11.4 获取收到的好友请求](#114-获取收到的好友请求)
-  - [11.5 获取发送的好友请求](#115-获取发送的好友请求)
-  - [11.6 获取待处理的好友请求数量](#116-获取待处理的好友请求数量)
-  - [11.7 获取好友列表](#117-获取好友列表)
-  - [11.8 删除好友](#118-删除好友)
-- [12. 聊天模块](#12-聊天模块)
-  - [12.1 发送消息](#121-发送消息)
-  - [12.2 获取聊天历史](#122-获取聊天历史)
-  - [12.3 分页获取聊天历史](#123-分页获取聊天历史)
-  - [12.4 获取会话列表](#124-获取会话列表)
-  - [12.5 标记消息为已读](#125-标记消息为已读)
-  - [12.6 标记所有消息为已读](#126-标记所有消息为已读)
-  - [12.7 获取未读消息数量](#127-获取未读消息数量)
-  - [12.8 获取未读消息详情](#128-获取未读消息详情)
-  - [12.9 删除消息](#129-删除消息)
-  - [12.10 检查用户在线状态](#1210-检查用户在线状态)
-  - [11.9 检查好友关系](#119-检查好友关系)
-- [12. 即时通信模块](#12-即时通信模块)
-  - [12.1 发送消息](#121-发送消息)
-  - [12.2 获取聊天历史](#122-获取聊天历史)
-  - [12.3 分页获取聊天历史](#123-分页获取聊天历史)
-  - [12.4 获取会话列表](#124-获取会话列表)
-  - [12.5 标记消息为已读](#125-标记消息为已读)
-  - [12.6 标记所有消息为已读](#126-标记所有消息为已读)
-  - [12.7 获取未读消息数量](#127-获取未读消息数量)
-  - [12.8 获取未读消息详情](#128-获取未读消息详情)
-  - [12.9 删除消息](#129-删除消息)
-  - [12.10 检查用户在线状态](#1210-检查用户在线状态)
-  - [12.11 WebSocket连接](#1211-websocket连接)
-- [13. 数据模型](#13-数据模型)
-  - [13.1 用户模型](#131-用户模型)
-  - [13.2 消息模型](#132-消息模型)
+- [11. 通知模块](#11-通知模块)
+  - [11.1 获取通知列表](#111-获取通知列表)
+  - [11.2 获取未读通知数量](#112-获取未读通知数量)
+  - [11.3 标记通知为已读](#113-标记通知为已读)
+  - [11.4 标记所有通知为已读](#114-标记所有通知为已读)
+  - [11.5 获取未读通知列表](#115-获取未读通知列表)
+  - [11.6 WebSocket实时通知](#116-websocket实时通知)
+- [12. 好友模块](#12-好友模块)
+  - [12.1 发送好友请求](#121-发送好友请求)
+  - [12.2 接受好友请求](#122-接受好友请求)
+  - [12.3 拒绝好友请求](#123-拒绝好友请求)
+  - [12.4 获取收到的好友请求](#124-获取收到的好友请求)
+  - [12.5 获取发送的好友请求](#125-获取发送的好友请求)
+  - [12.6 获取待处理的好友请求数量](#126-获取待处理的好友请求数量)
+  - [12.7 获取好友列表](#127-获取好友列表)
+  - [12.8 删除好友](#128-删除好友)
+  - [12.9 检查好友关系](#129-检查好友关系)
+- [13. 即时通信模块](#13-即时通信模块)
+  - [13.1 发送消息](#131-发送消息)
+  - [13.2 获取聊天历史](#132-获取聊天历史)
+  - [13.3 分页获取聊天历史](#133-分页获取聊天历史)
+  - [13.4 获取会话列表](#134-获取会话列表)
+  - [13.5 标记消息为已读](#135-标记消息为已读)
+  - [13.6 标记所有消息为已读](#136-标记所有消息为已读)
+  - [13.7 获取未读消息数量](#137-获取未读消息数量)
+  - [13.8 获取未读消息详情](#138-获取未读消息详情)
+  - [13.9 删除消息](#139-删除消息)
+  - [13.10 检查用户在线状态](#1310-检查用户在线状态)
+  - [13.11 WebSocket连接](#1311-websocket连接)
+- [14. 数据模型](#14-数据模型)
+  - [14.1 用户模型](#141-用户模型)
+  - [14.2 消息模型](#142-消息模型)
+  - [14.3 通知模型](#143-通知模型)
 
 ## 1. 概述
 
@@ -917,6 +914,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 
 | 参数名 | 类型 | 必填 | 描述 |
 | ------ | ---- | ---- | ---- |
+| title | String | 是 | 动态标题 |
 | content | String | 是 | 动态内容 |
 | visibility | Integer | 否 | 可见性(0:公开,1:好友可见,2:仅自己可见)，默认为0 |
 
@@ -924,7 +922,8 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 
 ```json
 {
-  "content": "这是我的第一条动态！",
+  "title": "我的第一条动态",
+  "content": "这是我的第一条动态的内容！",
   "visibility": 0
 }
 ```
@@ -1648,9 +1647,291 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-## 11. 好友模块
+## 11. 通知模块
 
-### 11.1 发送好友请求
+通知模块处理系统中的通知功能，包括评论通知、点赞通知等。系统基于AOP实现自动通知生成，并通过WebSocket实时推送给用户。通知在数据库中存储发送者ID（senderId），在返回给前端时会动态附加发送者的昵称和头像信息。
+
+### 11.1 获取通知列表
+
+获取当前登录用户的通知列表。
+
+**请求URL**: `/notification/list`
+
+**请求方式**: `GET`
+
+**请求参数**:
+
+| 参数名 | 类型 | 必需 | 描述 |
+| ------ | ---- | ---- | ---- |
+| page | Integer | 否 | 页码，默认1 |
+| size | Integer | 否 | 每页条数，默认10 |
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "notificationId": 123,
+      "userId": 1001,
+      "senderId": 2002,
+      "type": 1,
+      "content": "评论:这是一条评论",
+      "readStatus": 0,
+      "createdAt": "2025-05-28T15:30:00",
+      "relatedEntityId": 2001,
+      "relatedEntityType": 0,
+      "senderName": "张三",
+      "senderAvatar": "https://example.com/avatar/user2.jpg"
+    },
+    {
+      "notificationId": 124,
+      "userId": 1001,
+      "senderId": 2003,
+      "type": 2,
+      "content": "点赞了您的动态",
+      "readStatus": 1,
+      "createdAt": "2025-05-28T14:20:00",
+      "relatedEntityId": 2001,
+      "relatedEntityType": 0,
+      "senderName": "李四",
+      "senderAvatar": "https://example.com/avatar/user3.jpg"
+    }
+  ]
+}
+```
+
+**字段说明**:
+
+| 字段名 | 类型 | 描述 |
+| ------ | ---- | ---- |
+| notificationId | Integer | 通知ID |
+| userId | Integer | 接收通知的用户ID |
+| senderId | Integer | 发送通知的用户ID |
+| type | Integer | 通知类型(0:系统, 1:评论, 2:点赞) |
+| content | String | 通知内容 |
+| readStatus | Integer | 读取状态(0:未读,1:已读) |
+| relatedEntityId | Integer | 关联实体ID |
+| relatedEntityType | Integer | 关联实体类型 |
+| createdAt | String | 创建时间 |
+| senderName | String | 发送者昵称（非数据库字段，动态获取） |
+| senderAvatar | String | 发送者头像URL（非数据库字段，动态获取） |
+
+### 11.2 获取未读通知数量
+
+获取当前登录用户的未读通知数量。
+
+**请求URL**: `/notification/unreadCount`
+
+**请求方式**: `GET`
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": 5
+}
+```
+
+### 11.3 标记通知为已读
+
+将指定通知标记为已读状态。
+
+**请求URL**: `/notification/read/{notificationId}`
+
+**请求方式**: `POST`
+
+**路径参数**:
+
+| 参数名 | 类型 | 必需 | 描述 |
+| ------ | ---- | ---- | ---- |
+| notificationId | Integer | 是 | 通知ID |
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "标记成功"
+}
+```
+
+### 11.4 标记所有通知为已读
+
+将当前登录用户的所有未读通知标记为已读。
+
+**请求URL**: `/notification/readAll`
+
+**请求方式**: `POST`
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "count": 5
+  }
+}
+```
+
+**字段说明**:
+
+| 字段名 | 类型 | 描述 |
+| ------ | ---- | ---- |
+| count | Integer | 标记为已读的通知数量 |
+
+### 11.5 获取未读通知列表
+
+获取当前登录用户的所有未读通知。
+
+**请求URL**: `/notification/unread`
+
+**请求方式**: `GET`
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "notificationId": 123,
+      "userId": 1001,
+      "senderId": 2002,
+      "type": 1,
+      "content": "评论:这是一条评论",
+      "readStatus": 0,
+      "createdAt": "2025-05-28T15:30:00",
+      "relatedEntityId": 2001,
+      "relatedEntityType": 0,
+      "senderName": "张三",
+      "senderAvatar": "https://example.com/avatar/user2.jpg"
+    }
+  ]
+}
+```
+
+### 11.6 WebSocket实时通知
+
+系统使用WebSocket实现实时通知推送。
+
+**WebSocket连接URL**: `/ws/chat/{token}`
+
+其中token是用户的JWT令牌，用于身份验证。
+
+**消息格式**:
+
+1. 连接成功响应
+
+```json
+{
+  "type": "connect",
+  "status": "success",
+  "userId": 10001
+}
+```
+
+2. 新通知消息
+
+```json
+{
+  "type": "notification",
+  "data": {
+    "notificationId": 123,
+    "userId": 10001,
+    "senderId": 10002,
+    "type": 1,
+    "content": "评论:这篇文章很有见解！",
+    "readStatus": 0,
+    "relatedEntityId": 2001,
+    "relatedEntityType": 0,
+    "createdAt": "2025-05-28T15:30:00",
+    "senderName": "张三",
+    "senderAvatar": "https://example.com/avatar/user2.jpg"
+  },
+  "unreadCount": 5
+}
+```
+
+3. 未读通知数量和列表
+
+```json
+{
+  "type": "unreadNotification",
+  "count": 5,
+  "notifications": [
+    {
+      "notificationId": 123,
+      "userId": 10001,
+      "senderId": 10002,
+      "type": 1,
+      "content": "评论:这篇文章很有见解！",
+      "readStatus": 0,
+      "relatedEntityId": 2001,
+      "relatedEntityType": 0,
+      "createdAt": "2025-05-28T15:30:00",
+      "senderName": "张三",
+      "senderAvatar": "https://example.com/avatar/user2.jpg"
+    }
+    // 更多通知...
+  ]
+}
+```
+
+4. 未读消息数量和详情
+
+```json
+{
+  "type": "unread",
+  "total": 10,
+  "details": {
+    "10002": 5,
+    "10003": 3,
+    "10004": 2
+  }
+}
+```
+
+**发送给服务器的消息格式**:
+
+1. 心跳消息 - 保持连接活跃
+
+```json
+{
+  "type": "heartbeat"
+}
+```
+
+2. 标记通知为已读 - 单条通知
+
+```json
+{
+  "type": "readNotification",
+  "action": "markOne",
+  "notificationId": 123
+}
+```
+
+3. 标记所有通知为已读
+
+```json
+{
+  "type": "readNotification",
+  "action": "markAll"
+}
+```
+
+## 12. 好友模块
+
+### 12.1 发送好友请求
 
 向指定用户发送好友请求。
 
@@ -1694,7 +1975,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.2 接受好友请求
+### 12.2 接受好友请求
 
 接受指定的好友请求，并建立好友关系。
 
@@ -1737,7 +2018,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.3 拒绝好友请求
+### 12.3 拒绝好友请求
 
 拒绝指定的好友请求。
 
@@ -1780,7 +2061,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.4 获取收到的好友请求
+### 12.4 获取收到的好友请求
 
 获取当前登录用户收到的所有好友请求。
 
@@ -1816,7 +2097,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.5 获取发送的好友请求
+### 12.5 获取发送的好友请求
 
 获取当前登录用户发送的所有好友请求。
 
@@ -1850,7 +2131,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.6 获取待处理的好友请求数量
+### 12.6 获取待处理的好友请求数量
 
 获取当前登录用户收到的待处理好友请求数量。
 
@@ -1873,7 +2154,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.7 获取好友列表
+### 12.7 获取好友列表
 
 获取当前登录用户的好友列表。
 
@@ -1908,7 +2189,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.8 删除好友
+### 12.8 删除好友
 
 删除当前登录用户与指定用户的好友关系。
 
@@ -1941,7 +2222,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 11.9 检查好友关系
+### 12.9 检查好友关系
 
 检查当前登录用户与指定用户是否是好友关系。
 
@@ -1974,52 +2255,11 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-## 12. 数据模型
-
-### 12.1 用户模型
-
-用户表(`user`)存储用户基本信息。
-
-| 字段名 | 类型 | 必填 | 默认值 | 描述 |
-| ------ | ---- | ---- | ------ | ---- |
-| user_id | BIGINT | 自动生成 | 自增 | 用户ID，主键 |
-| email | VARCHAR(25) | 是 | 无 | 用户邮箱，唯一 |
-| password_hash | VARCHAR(128) | 是 | 无 | 密码哈希值 |
-| nickname | VARCHAR(50) | 是 | 无 | 用户昵称，唯一 |
-| avatar_url | VARCHAR(255) | 否 | NULL | 用户头像URL |
-| auth_status | TINYINT | 否 | 0 | 认证状态(0:未认证,1:已认证,2:认证中) |
-| account_status | TINYINT | 否 | 0 | 账号状态(0:正常,1:禁用) |
-| department | VARCHAR(50) | 否 | NULL | 所属院系 |
-| school | VARCHAR(20) | 否 | NULL | 所属学校 |
-| before_card_url | VARCHAR(255) | 否 | NULL | 校园卡正面图片URL |
-| after_card_url | VARCHAR(255) | 否 | NULL | 校园卡反面图片URL |
-| created_at | DATETIME | 自动生成 | CURRENT_TIMESTAMP | 创建时间 |
-| updated_at | DATETIME | 自动生成 | CURRENT_TIMESTAMP | 更新时间 |
-
-**注意事项**:
-
-1. **必填字段**:
-   - `email`: 用户邮箱，必须唯一
-   - `password_hash`: 密码哈希，前端需要进行加密处理
-   - `nickname`: 用户昵称，必须唯一
-
-2. **可选字段**:
-   - `avatar_url`: 用户头像URL，可通过文件上传接口获取
-   - `department`: 用户所属院系
-   - `school`: 用户所属学校
-   - `before_card_url`和`after_card_url`: 校园卡照片，用于实名认证
-
-3. **自动生成字段**:
-   - `user_id`: 系统自动生成的用户ID
-   - `auth_status`: 默认为0(未认证)
-   - `account_status`: 默认为0(正常)
-   - `created_at`和`updated_at`: 系统自动维护的时间戳
-
-## 12. 即时通信模块
+## 13. 即时通信模块
 
 即时通信模块支持好友之间的实时消息交流，包括文本消息和图片消息。模块支持HTTP REST API和WebSocket两种通信方式。
 
-### 12.1 发送消息
+### 13.1 发送消息
 
 **请求方式**：POST
 
@@ -2043,7 +2283,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.2 获取聊天历史
+### 13.2 获取聊天历史
 
 **请求方式**：GET
 
@@ -2090,7 +2330,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.3 分页获取聊天历史
+### 13.3 分页获取聊天历史
 
 **请求方式**：GET
 
@@ -2106,13 +2346,13 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 
 **响应参数**：同聊天历史接口
 
-### 12.4 获取会话列表
+### 13.4 获取会话列表
 
 **请求方式**：GET
 
 **请求URL**：`/chat/conversations`
 
-**请求参数**：无
+**请求参数**: 无
 
 **响应参数**：
 
@@ -2149,7 +2389,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.5 标记消息为已读
+### 13.5 标记消息为已读
 
 **请求方式**：POST
 
@@ -2171,7 +2411,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.6 标记所有消息为已读
+### 13.6 标记所有消息为已读
 
 **请求方式**：POST
 
@@ -2193,13 +2433,13 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.7 获取未读消息数量
+### 13.7 获取未读消息数量
 
 **请求方式**：GET
 
 **请求URL**：`/chat/unread/count`
 
-**请求参数**：无
+**请求参数**: 无
 
 **响应参数**：
 
@@ -2211,13 +2451,13 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.8 获取未读消息详情
+### 13.8 获取未读消息详情
 
 **请求方式**：GET
 
 **请求URL**：`/chat/unread/details`
 
-**请求参数**：无
+**请求参数**: 无
 
 **响应参数**：
 
@@ -2233,7 +2473,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.9 删除消息
+### 13.9 删除消息
 
 **请求方式**：DELETE
 
@@ -2255,7 +2495,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.10 检查用户在线状态
+### 13.10 检查用户在线状态
 
 **请求方式**：GET
 
@@ -2277,7 +2517,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-### 12.11 WebSocket连接
+### 13.11 WebSocket连接
 
 **连接URL**：`ws://localhost:8080/ws/chat/{token}`
 
@@ -2320,16 +2560,19 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 
 // 收到新消息
 {
-  "messageId": "123456789",
-  "senderId": "222222",
-  "receiverId": "111111",
-  "content": "你好！",
-  "messageType": 0,
-  "readStatus": 0,
-  "createdAt": "2025-05-26T10:10:10",
-  "senderNickname": "李四",
-  "senderAvatarUrl": "http://example.com/avatar/2.jpg",
-  "isFromCurrentUser": false
+  "type": "chat",
+  "data": {
+    "messageId": "123456789",
+    "senderId": "222222",
+    "receiverId": "111111",
+    "content": "你好！",
+    "messageType": 0,
+    "readStatus": 0,
+    "createdAt": "2025-05-26T10:10:10",
+    "senderNickname": "李四",
+    "senderAvatarUrl": "http://example.com/avatar/2.jpg",
+    "isFromCurrentUser": false
+  }
 }
 
 // 未读消息数量
@@ -2350,26 +2593,135 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 }
 ```
 
-## 13. 数据模型
+## 14. 数据模型
 
-### 13.1 用户模型
+### 14.3 通知模型
 
 ```json
 {
-  "userId": "111111",
-  "username": "zhangsan",
-  "nickname": "张三",
-  "email": "zhangsan@example.com",
-  "phone": "13800138000",
-  "avatarUrl": "http://example.com/avatar/1.jpg",
-  "gender": 1,
-  "bio": "我是张三",
-  "birthday": "2000-01-01",
-  "createdAt": "2023-01-01T12:00:00"
+  "notificationId": 123,
+  "userId": 1001,
+  "type": 1,
+  "content": "张三评论了你的动态：这篇文章很有见解！",
+  "readStatus": 0,
+  "relatedEntityId": 2001,
+  "relatedEntityType": 0,
+  "createdAt": "2025-05-28T15:30:00",
+  "senderName": "张三",
+  "senderAvatar": "https://example.com/avatar/user1.jpg"
 }
 ```
 
-### 13.2 消息模型
+**字段说明：**
+
+| 字段名 | 类型 | 描述 |
+| ------ | ---- | ---- |
+| notificationId | Integer | 通知ID，唯一标识 |
+| userId | Integer | 接收通知的用户ID |
+| type | Integer | 通知类型(0:系统通知, 1:评论通知, 2:点赞通知) |
+| content | String | 通知内容，包含具体信息 |
+| readStatus | Integer | 读取状态(0:未读, 1:已读) |
+| relatedEntityId | Integer | 关联实体ID，如被评论的动态ID或被点赞的评论ID |
+| relatedEntityType | Integer | 关联实体类型(0:动态, 1:评论) |
+| createdAt | DateTime | 通知创建时间 |
+| senderName | String | 发送者名称（非数据库字段，返回给前端时填充） |
+| senderAvatar | String | 发送者头像URL（非数据库字段，返回给前端时填充） |
+
+**通知类型说明：**
+
+1. **系统通知 (type=0)**：系统生成的通知，如账号状态变更、认证结果等
+   ```json
+   {
+     "notificationId": 101,
+     "userId": 1001,
+     "type": 0,
+     "content": "您的账号已通过认证！",
+     "readStatus": 0,
+     "relatedEntityId": null,
+     "relatedEntityType": null,
+     "createdAt": "2025-05-28T12:00:00",
+     "senderName": "系统",
+     "senderAvatar": "https://example.com/avatar/system.jpg"
+   }
+   ```
+
+2. **评论通知 (type=1)**：当用户收到评论时的通知
+   ```json
+   {
+     "notificationId": 102,
+     "userId": 1001,
+     "type": 1,
+     "content": "李四评论了你的动态：这个观点很新颖！",
+     "readStatus": 0,
+     "relatedEntityId": 2001,
+     "relatedEntityType": 0,
+     "createdAt": "2025-05-28T14:30:00",
+     "senderName": "李四",
+     "senderAvatar": "https://example.com/avatar/user2.jpg"
+   }
+   ```
+
+3. **点赞通知 (type=2)**：当用户收到点赞时的通知
+   ```json
+   {
+     "notificationId": 103,
+     "userId": 1001,
+     "type": 2,
+     "content": "王五点赞了你的动态",
+     "readStatus": 0,
+     "relatedEntityId": 2001,
+     "relatedEntityType": 0,
+     "createdAt": "2025-05-28T16:45:00",
+     "senderName": "王五",
+     "senderAvatar": "https://example.com/avatar/user3.jpg"
+   }
+   ```
+
+**注意事项：**
+
+1. 通知系统通过AOP（面向切面编程）实现，使用`@GenerateNotification`注解自动生成通知
+2. 系统支持WebSocket实时推送通知，详见[11.6 WebSocket实时通知](#116-websocket实时通知)
+3. 前端应根据通知类型(type)和关联实体类型(relatedEntityType)渲染不同样式的通知
+4. 点击通知应跳转至相关内容（如被评论的动态或评论）
+
+用户表(`user`)存储用户基本信息。
+
+| 字段名 | 类型 | 必填 | 默认值 | 描述 |
+| ------ | ---- | ---- | ------ | ---- |
+| user_id | BIGINT | 自动生成 | 自增 | 用户ID，主键 |
+| email | VARCHAR(25) | 是 | 无 | 用户邮箱，唯一 |
+| password_hash | VARCHAR(128) | 是 | 无 | 密码哈希值 |
+| nickname | VARCHAR(50) | 是 | 无 | 用户昵称，唯一 |
+| avatar_url | VARCHAR(255) | 否 | NULL | 用户头像URL |
+| auth_status | TINYINT | 否 | 0 | 认证状态(0:未认证,1:已认证,2:认证中) |
+| account_status | TINYINT | 否 | 0 | 账号状态(0:正常,1:禁用) |
+| department | VARCHAR(50) | 否 | NULL | 所属院系 |
+| school | VARCHAR(20) | 否 | NULL | 所属学校 |
+| before_card_url | VARCHAR(255) | 否 | NULL | 校园卡正面图片URL |
+| after_card_url | VARCHAR(255) | 否 | NULL | 校园卡反面图片URL |
+| created_at | DATETIME | 自动生成 | CURRENT_TIMESTAMP | 创建时间 |
+| updated_at | DATETIME | 自动生成 | CURRENT_TIMESTAMP | 更新时间 |
+
+**注意事项**：
+
+1. **必填字段**：
+   - `email`: 用户邮箱，必须唯一
+   - `password_hash`: 密码哈希，前端需要进行加密处理
+   - `nickname`: 用户昵称，必须唯一
+
+2. **可选字段**：
+   - `avatar_url`: 用户头像URL，可通过文件上传接口获取
+   - `department`: 用户所属院系
+   - `school`: 用户所属学校
+   - `before_card_url`和`after_card_url`: 校园卡照片，用于实名认证
+
+3. **自动生成字段**：
+   - `user_id`: 系统自动生成的用户ID
+   - `auth_status`: 默认为0(未认证)
+   - `account_status`: 默认为0(正常)
+   - `created_at`和`updated_at`: 系统自动维护的时间戳
+
+### 14.2 消息模型
 
 ```json
 {

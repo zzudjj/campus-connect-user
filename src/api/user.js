@@ -138,3 +138,39 @@ export const uploadStudentCard = async (data) => {
     };
   }
 }
+
+/**
+ * 用户登出
+ * @returns {Promise} 返回登出结果
+ */
+export const logout = async () => {
+  try {
+    // 清除本地存储的token
+    localStorage.removeItem('token');
+    
+    // 动态导入ChatSocketService，避免循环依赖
+    try {
+      // 关闭WebSocket连接 - 现在一个服务同时处理聊天和通知
+      const { closeWebSocket } = await import('../services/ChatSocketService');
+      if (typeof closeWebSocket === 'function') {
+        closeWebSocket();
+        console.log('已关闭WebSocket连接');
+      }
+    } catch (error) {
+      console.warn('关闭WebSocket连接失败:', error);
+    }
+    
+    return {
+      code: 200,
+      message: '登出成功',
+      data: null
+    };
+  } catch (error) {
+    console.error('用户登出失败:', error);
+    return {
+      code: 500,
+      message: '登出失败',
+      data: null
+    };
+  }
+}
