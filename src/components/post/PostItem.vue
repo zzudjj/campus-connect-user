@@ -18,12 +18,12 @@
         <div class="username">
           {{ post.username }}
           <!-- 用户认证标志 -->
-          <span v-if="post.authStatus == 2" class="auth-badge" title="已认证用户">
-            <i class="fas fa-check-circle" style="color: #4CAF50;"></i>
+          <span v-if="post.authStatus == 2" class="auth-badge" title="认证中">
+            <i class="fas fa-circle" style="color: #4CAF50;"></i>
           </span>
           <!-- 用户认证中标志 -->
-          <span v-else-if="post.authStatus == 1" class="auth-badge" title="认证中">
-            <i class="fas fa-clock" style="color: #FFC107;"></i>
+          <span v-else-if="post.authStatus == 1" class="auth-badge" title="已认证">
+            <i class="fas fa-check-circle" style="color: #FFC107;"></i>
           </span>
           <!-- 未认证标志 -->
           <span v-else class="auth-badge" title="未认证">

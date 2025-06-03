@@ -80,6 +80,90 @@ export const getUserPublicProfile = async (userId) => {
 }
 
 /**
+ * 根据昵称模糊搜索用户
+ * @param {string} nickname - 要搜索的用户昵称关键词
+ * @param {number} page - 页码，默认为1
+ * @param {number} size - 每页数量，默认为10
+ * @returns {Promise} 返回匹配的用户列表和分页信息
+ */
+export const searchUsersByNickname = async (nickname, page = 1, size = 10) => {
+  try {
+    console.log(`搜索用户昵称: ${nickname}, 页码: ${page}, 每页数量: ${size}`);
+    const response = await axios.get(`http://localhost:8080/user/search/nickname`, {
+      params: {
+        nickname,
+        page,
+        size
+      },
+      headers: {
+        'token': localStorage.getItem('token')
+      }
+    });
+    
+    if (response.data && response.data.code === 200) {
+      console.log('搜索用户成功:', response.data.data);
+      
+      // 调整返回结果以适应我们的组件需求
+      const data = response.data.data || {};
+      
+      // 检查返回数据的结构，适配不同的命名约定
+      const result = {
+        code: response.data.code,
+        message: response.data.message,
+        data: {
+          total: data.total || data.totalCount || 0,
+          list: data.list || data.users || [],
+          pageNum: data.pageNum || data.currentPage || page,
+          pageSize: data.pageSize || size,
+          pages: data.pages || data.totalPages || 1
+        }
+      };
+      
+      console.log('处理后的搜索结果:', result);
+      return result;
+    } else {
+      console.warn('搜索用户响应异常:', response.data);
+      return { code: 500, message: response.data.message || '搜索用户失败', data: { total: 0, list: [], pageNum: page, pageSize: size, pages: 1 } };
+    }
+  } catch (error) {
+    console.error('搜索用户异常:', error);
+    return { code: 500, message: '搜索用户失败: ' + (error.message || '网络错误'), data: { total: 0, list: [], pageNum: page, pageSize: size, pages: 1 } };
+  }
+};
+
+/**
+ * 获取非好友用户列表
+ * @param {number} page - 页码，默认为1
+ * @param {number} size - 每页数量，默认为10
+ * @returns {Promise} 返回非好友用户列表和分页信息
+ */
+export const getNonFriendUsers = async (page = 1, size = 10) => {
+  try {
+    console.log(`获取非好友用户列表: 页码=${page}, 每页=${size}`);
+    const response = await axios.get(`http://localhost:8080/user/non-friends`, {
+      params: {
+        page,
+        size
+      },
+      headers: {
+        'token': localStorage.getItem('token')
+      }
+    });
+    
+    if (response.data && response.data.code === 200) {
+      console.log('获取非好友用户成功:', response.data);
+      return response.data;
+    } else {
+      console.warn('获取非好友用户响应异常:', response.data);
+      return { code: response.data.code || 500, message: response.data.message || '获取非好友用户失败', data: { list: [], total: 0, pageNum: page, pageSize: size, pages: 1 } };
+    }
+  } catch (error) {
+    console.error('获取非好友用户异常:', error);
+    return { code: 500, message: '获取非好友用户失败: ' + (error.message || '网络错误'), data: { list: [], total: 0, pageNum: page, pageSize: size, pages: 1 } };
+  }
+};
+
+/**
  * 获取所有用户简要信息
  * @returns {Promise} 返回所有用户的简要信息列表
  */

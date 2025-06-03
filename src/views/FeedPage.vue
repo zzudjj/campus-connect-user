@@ -17,6 +17,13 @@
         >
           最新
         </div>
+        <div 
+          class="mode-tab" 
+          :class="{ active: mode === 'friend' }" 
+          @click="switchMode('friend')"
+        >
+          好友
+        </div>
         <div class="active-tab-indicator" :class="mode"></div>
       </div>
     </div>
@@ -85,7 +92,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, defineEmits, inject, nextTick, computed } from 'vue';
-import { getHotPosts, getNewPosts, getPostsByIds } from '../api/post';
+import { getHotPosts, getNewPosts, getPostsByIds, getFriendPosts } from '../api/post';
 import { toggleLike, getLikeStatus } from '@/api/like';
 import PostItem from '../components/post/PostItem.vue';
 import PostModal from '../components/modals/PostModal.vue';
@@ -107,7 +114,7 @@ const loadingMore = ref(false); // 加载更多状态
 const hasMore = ref(true); // 是否还有更多数据
 
 // 分页参数
-const pageSize = 5; // 每页数量
+const pageSize = 15; // 每页数量，与API文档默认值保持一致
 const currentStart = ref(0); // 当前起始位置
 
 // 模式切换
@@ -187,89 +194,216 @@ const fetchPostLikeStatus = async (postId) => {
 
 // 加载动态列表
 const loadPosts = async () => {
+  if (!hasMore.value || loadingMore.value) return;
+  
+  console.group('加载动态');
+  console.log(`当前模式: ${mode.value}, 页码: ${currentStart.value}`);
+  
+  loadingMore.value = true;
+  
   try {
-    // 如果是加载更多，则设置加载更多状态为真
-    if (currentStart.value > 0) {
-      loadingMore.value = true;
-    }
+    // 根据不同模式，调用不同的API获取动态ID列表
+    let postsResult;
+    let postIds = [];
+    let postsList = [];
     
-    // 根据当前模式获取动态ID列表
-    let postIdsResponse;
+    // 如果是热门模式，获取热门动态列表
     if (mode.value === 'hot') {
-      postIdsResponse = await getHotPosts(currentStart.value, pageSize);
-    } else {
-      postIdsResponse = await getNewPosts(currentStart.value, pageSize);
-    }
-    
-    console.log(`获取${mode.value === 'hot' ? '热门' : '最新'}动态ID列表:`, postIdsResponse);
-    
-    if (postIdsResponse.code === 200 && postIdsResponse.data && postIdsResponse.data.length > 0) {
-      // 获取到动态ID列表，然后批量获取动态详情
-      const postDetailsResponse = await getPostsByIds(postIdsResponse.data);
+      console.log('获取热门动态列表...');
+      postsResult = await getHotPosts(currentStart.value, pageSize);
       
-      if (postDetailsResponse.code === 200 && postDetailsResponse.data) {
-        console.log('批量获取动态详情成功:', postDetailsResponse.data.length, '条记录');
-        
-        // 处理返回的动态详情
-        const newPosts = postDetailsResponse.data;
-        
-        // 处理每个动态的数据
-        for (let i = 0; i < newPosts.length; i++) {
-          const post = newPosts[i];
-          // 确保字段名称一致
-          post.id = post.id || post.postId;
-          post.likeCount = post.likeNum || post.likeCount || 0;
-          post.commentCount = post.commentNum || post.commentCount || 0;
-          
-          // 确保媒体字段存在
-          if (!post.media) {
-            post.media = [];
-          }
-        }
-        
-        // 获取每个动态的点赞状态
-        const likeStatusPromises = newPosts.map(async (post, index) => {
-          const postId = post.id || post.postId;
-          const likeStatus = await fetchPostLikeStatus(postId);
-          newPosts[index].isLiked = likeStatus.isLiked;
-          newPosts[index].likeCount = likeStatus.likeCount;
-          
-          // 打印调试信息
-          console.log(`动态 ${postId} 的媒体:`, newPosts[index].media);
-        });
-        
-        // 等待所有点赞状态获取完成
-        await Promise.all(likeStatusPromises);
-        
-        // 如果是加载更多，则追加到现有列表；否则替换整个列表
-        if (currentStart.value > 0) {
-          posts.value = [...posts.value, ...newPosts];
+      if (postsResult.code === 200) {
+        console.log('热门动态获取成功:', postsResult);
+        // 处理可能的不同响应格式
+        if (Array.isArray(postsResult.data)) {
+          postIds = postsResult.data.map(post => post.postId || post);
+        } else if (postsResult.data && Array.isArray(postsResult.data.list)) {
+          postIds = postsResult.data.list.map(post => post.postId || post);
         } else {
-          posts.value = newPosts;
+          console.warn('热门动态响应格式异常:', postsResult.data);
+          postIds = [];
+        }
+      } else {
+        throw new Error(postsResult.message || '获取热门动态失败');
+      }
+    } 
+    // 如果是最新模式，获取最新动态列表
+    else if (mode.value === 'new') {
+      console.log('获取最新动态列表...');
+      postsResult = await getNewPosts(currentStart.value * pageSize, pageSize);
+      
+      if (postsResult.code === 200) {
+        console.log('最新动态获取成功:', postsResult.data);
+        // 处理可能的不同响应格式
+        if (Array.isArray(postsResult.data)) {
+          postIds = postsResult.data.map(item => typeof item === 'object' ? (item.postId || item) : item);
+        } else if (postsResult.data && Array.isArray(postsResult.data.list)) {
+          postIds = postsResult.data.list.map(item => typeof item === 'object' ? (item.postId || item) : item);
+        } else {
+          console.warn('最新动态响应格式异常:', postsResult.data);
+          postIds = [];
+        }
+      } else {
+        throw new Error(postsResult.message || '获取最新动态失败');
+      }
+    }
+    // 如果是好友模式，获取好友动态列表
+    else if (mode.value === 'friend') {
+      console.log('获取好友动态列表...');
+      const params = {
+        page: currentStart.value + 1, // API从1开始计数
+        size: pageSize
+      };
+      
+      postsResult = await getFriendPosts(params);
+      
+      if (postsResult.code === 200 && postsResult.data && postsResult.data.list) {
+        console.log('好友动态获取成功:', postsResult.data);
+        
+        // 抽取好友动态ID列表，然后使用与热门和最新模式相同的逻辑获取完整详情
+        console.log('处理好友动态数据...');
+        const friendPostIds = postsResult.data.list.map(post => post.postId);
+        
+        // 好友动态API可能返回空列表
+        if (postsResult.data.list.length < pageSize || currentStart.value + 1 >= postsResult.data.pages) {
+          console.log('没有更多好友动态');
+          hasMore.value = false;
         }
         
-        // 更新数据加载开始位置
-        currentStart.value += newPosts.length;
+        // 如果没有好友动态，直接返回
+        if (friendPostIds.length === 0) {
+          loadingMore.value = false;
+          console.groupEnd();
+          return;
+        }
         
-        // 判断是否还有更多数据
-        hasMore.value = newPosts.length === pageSize;
+        // 获取动态详情，包括媒体文件和用户信息
+        const postDetailsResponse = await getPostsByIds(friendPostIds);
+        
+        if (postDetailsResponse.code === 200 && postDetailsResponse.data) {
+          console.log('批量获取好友动态详情成功:', postDetailsResponse.data.length, '条记录');
+          
+          // 处理返回的好友动态详情
+          const newPosts = postDetailsResponse.data;
+          
+          // 处理每个动态的数据
+          for (let i = 0; i < newPosts.length; i++) {
+            const post = newPosts[i];
+            // 确保字段名称一致
+            post.id = post.id || post.postId;
+            post.likeCount = post.likeNum || post.likeCount || 0;
+            post.commentCount = post.commentNum || post.commentCount || 0;
+            
+            // 确保媒体字段存在
+            if (!post.media) {
+              post.media = [];
+            }
+          }
+          
+          // 获取每个动态的点赞状态
+          const likeStatusPromises = newPosts.map(async (post) => {
+            const postId = post.id || post.postId;
+            try {
+              const likeStatus = await fetchPostLikeStatus(postId);
+              post.isLiked = likeStatus.isLiked;
+              post.likeCount = likeStatus.likeCount || post.likeCount;
+            } catch (error) {
+              console.error(`获取好友动态 ${postId} 的点赞状态失败:`, error);
+            }
+          });
+          
+          // 等待所有点赞状态获取完成
+          await Promise.all(likeStatusPromises);
+          
+          // 更新好友动态列表
+          posts.value = [...posts.value, ...newPosts];
+          currentStart.value++;
+          loadingMore.value = false;
+          console.groupEnd();
+          return;
+        }
       } else {
-        if (currentStart.value === 0) {
-          posts.value = [];
+        if (postsResult.code === 401) {
+          ElMessage.warning('请先登录后查看好友动态');
+        } else if (postsResult.data && postsResult.data.list && postsResult.data.list.length === 0) {
+          ElMessage.info('暂无好友动态，快去添加好友吧');
+        } else {
+          throw new Error(postsResult.message || '获取好友动态失败');
         }
         hasMore.value = false;
-        console.error('批量获取动态详情失败:', postDetailsResponse);
+        loadingMore.value = false;
+        console.groupEnd();
+        return;
       }
+    }
+    
+    // 如果没有更多动态，设置hasMore为false
+    if (!postIds || postIds.length === 0) {
+      console.log('没有更多动态');
+      hasMore.value = false;
+      loadingMore.value = false;
+      console.groupEnd();
+      return;
+    }
+    
+    // 获取到动态ID列表，然后批量获取动态详情
+    const postDetailsResponse = await getPostsByIds(postIds);
+    
+    if (postDetailsResponse.code === 200 && postDetailsResponse.data) {
+      console.log('批量获取动态详情成功:', postDetailsResponse.data.length, '条记录');
+      
+      // 处理返回的动态详情
+      const newPosts = postDetailsResponse.data;
+      
+      // 处理每个动态的数据
+      for (let i = 0; i < newPosts.length; i++) {
+        const post = newPosts[i];
+        // 确保字段名称一致
+        post.id = post.id || post.postId;
+        post.likeCount = post.likeNum || post.likeCount || 0;
+        post.commentCount = post.commentNum || post.commentCount || 0;
+        
+        // 确保媒体字段存在
+        if (!post.media) {
+          post.media = [];
+        }
+      }
+      
+      // 获取每个动态的点赞状态
+      const likeStatusPromises = newPosts.map(async (post, index) => {
+        const postId = post.id || post.postId;
+        const likeStatus = await fetchPostLikeStatus(postId);
+        newPosts[index].isLiked = likeStatus.isLiked;
+        newPosts[index].likeCount = likeStatus.likeCount;
+        
+        // 打印调试信息
+        console.log(`动态 ${postId} 的媒体:`, newPosts[index].media);
+      });
+      
+      // 等待所有点赞状态获取完成
+      await Promise.all(likeStatusPromises);
+      
+      // 如果是加载更多，则追加到现有列表；否则替换整个列表
+      if (currentStart.value > 0) {
+        posts.value = [...posts.value, ...newPosts];
+      } else {
+        posts.value = newPosts;
+      }
+      
+      // 更新数据加载开始位置
+      currentStart.value += newPosts.length;
+      
+      // 判断是否还有更多数据
+      hasMore.value = newPosts.length === pageSize;
     } else {
-      // 没有获取到动态ID列表
       if (currentStart.value === 0) {
         posts.value = [];
       }
       hasMore.value = false;
-      console.log(`没有更多${mode.value === 'hot' ? '热门' : '最新'}动态了`);
+      console.error('批量获取动态详情失败:', postDetailsResponse);
     }
   } catch (error) {
-    console.error(`获取${mode.value === 'hot' ? '热门' : '最新'}动态失败:`, error);
+    console.error(`获取${mode.value === 'hot' ? '热门' : mode.value === 'new' ? '最新' : '好友'}动态失败:`, error);
     if (currentStart.value === 0) {
       posts.value = [];
     }
@@ -412,8 +546,6 @@ onBeforeUnmount(() => {
   // 移除事件监听器以防止内存泄漏
   document.removeEventListener('refresh-feed-list', handleRefreshFeedList);
 });
-
-
 </script>
 
 <style scoped>
@@ -437,7 +569,7 @@ onBeforeUnmount(() => {
   padding: 8px 0;
   border-radius: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  width: 220px;
+  width: 300px;
   margin-left: auto;
   margin-right: auto;
   margin-top: -5px;
@@ -463,6 +595,11 @@ onBeforeUnmount(() => {
   transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
 }
 
+/* 标签指示器位置 - 三个标签 */
+.active-tab-indicator {
+  width: 33.33%;
+}
+
 /* 热门标签指示器位置 */
 .active-tab-indicator.hot {
   transform: translateX(0);
@@ -471,6 +608,11 @@ onBeforeUnmount(() => {
 /* 最新标签指示器位置 */
 .active-tab-indicator.new {
   transform: translateX(100%);
+}
+
+/* 好友标签指示器位置 */
+.active-tab-indicator.friend {
+  transform: translateX(200%);
 }
 
 .mode-tab {

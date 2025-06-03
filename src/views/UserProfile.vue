@@ -11,25 +11,12 @@
             <div class="meta">
               <span v-if="user.school">{{ user.school }}</span>
               <span v-if="user.department">{{ user.department }}</span>
-              <el-tag v-if="user.verified" type="success" size="small">已认证</el-tag>
+              <el-tag v-if="user.authStatus === 1" type="success" size="small">已认证</el-tag>
+              <el-tag v-else-if="user.authStatus === 2" type="warning" size="small">认证中</el-tag>
               <el-tag v-else type="info" size="small">未认证</el-tag>
             </div>
           </div>
           <el-button type="primary" size="small" @click="editProfile">编辑资料</el-button>
-        </div>
-        <div class="profile-stats">
-          <div class="stat-item">
-            <div class="stat-count">{{ user.postCount }}</div>
-            <div class="stat-label">动态</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-count">{{ user.followCount }}</div>
-            <div class="stat-label">关注</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-count">{{ user.fanCount }}</div>
-            <div class="stat-label">粉丝</div>
-          </div>
         </div>
       </el-card>
       <!-- tab切换区 -->
@@ -53,11 +40,24 @@
             />
           </div>
         </el-tab-pane>
-        <el-tab-pane label="收藏" name="favorites">
-          <div class="empty">暂无收藏</div>
-        </el-tab-pane>
-        <el-tab-pane label="设置" name="settings">
-          <div class="empty">设置功能开发中...</div>
+        <el-tab-pane label="点赞" name="liked">
+          <div v-if="likedLoading" class="loading-container">
+            <el-skeleton :rows="3" animated />
+            <el-skeleton :rows="3" animated style="margin-top: 16px" />
+          </div>
+          <div v-else-if="likedPosts.length === 0" class="empty">
+            <i class="far fa-thumbs-up empty-icon"></i>
+            <div>暂无点赞动态</div>
+            <el-button type="primary" size="small" class="browse-posts-btn" @click="router.push('/feed')">去浏览动态</el-button>
+          </div>
+          <div v-else class="post-list">
+            <ProfilePostItem 
+              v-for="post in likedPosts" 
+              :key="post.id" 
+              :post="post" 
+              @expand="expandPost"
+            />
+          </div>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -100,11 +100,12 @@ import ProfilePostItem from '@/components/post/ProfilePostItem.vue';
 import PostItem from '@/components/post/PostItem.vue';
 import CommentModal from '@/components/modals/CommentModal.vue';
 import { getUserProfile } from '@/api/user';
-import { getCurrentUserPosts, getPostMedia } from '@/api/post';
+import { getCurrentUserPosts, getPostMedia, getUserLikedPosts } from '@/api/post';
 import { getLikeStatus, toggleLike } from '@/api/like';
 
 const router = useRouter();
 const loading = ref(true);
+const likedLoading = ref(false); // 点赞动态加载状态
 
 // 评论相关状态
 const commentModalVisible = ref(false);
@@ -118,14 +119,16 @@ const user = ref({
   email: '',
   school: '',
   department: '',
-  verified: false,
+  authStatus: 0, // 0: 未认证, 1: 已认证, 2: 认证中
   postCount: 0,
   followCount: 0,
   fanCount: 0
 });
 const posts = ref([]);
+const likedPosts = ref([]);
 const activeTab = ref('posts');
 
+// 获取用户个人资料
 const fetchProfile = async () => {
   try {
     const res = await getUserProfile(localStorage.getItem('token'));
@@ -200,7 +203,7 @@ const fetchUserPosts = async () => {
 
 // 编辑用户资料
 const editProfile = () => {
-  ElMessage.info('资料编辑功能开发中...');
+  router.push('/profile/edit');
 };
 
 // 展开查看完整动态
@@ -250,10 +253,48 @@ onMounted(() => {
   fetchProfile();
 });
 
+/**
+ * 获取用户点赞的动态
+ */
+const fetchLikedPosts = async () => {
+  if (likedPosts.value.length > 0) return; // 如果已经加载过，不重复加载
+  
+  try {
+    likedLoading.value = true;
+    const response = await getUserLikedPosts();
+    
+    if (response.code === 200 && response.data) {
+      likedPosts.value = response.data;
+      
+      // 尝试获取每个动态的点赞状态
+      for (const post of likedPosts.value) {
+        try {
+          const likeStatus = await getLikeStatus(post.id || post.postId);
+          post.isLiked = likeStatus.isLiked;
+          post.likeCount = likeStatus.likeCount;
+        } catch (error) {
+          console.error(`获取动态 ${post.id} 点赞状态失败:`, error);
+        }
+      }
+    } else {
+      ElMessage.warning('无法获取点赞动态');
+      likedPosts.value = [];
+    }
+  } catch (error) {
+    console.error('获取点赞动态失败:', error);
+    ElMessage.error(`获取点赞动态失败: ${error.message || '未知错误'}`);
+    likedPosts.value = [];
+  } finally {
+    likedLoading.value = false;
+  }
+};
+
 // 监听标签页切换
 watch(activeTab, (newTab) => {
   if (newTab === 'posts' && posts.value.length === 0) {
     fetchUserPosts();
+  } else if (newTab === 'liked' && likedPosts.value.length === 0) {
+    fetchLikedPosts();
   }
 });
 </script>

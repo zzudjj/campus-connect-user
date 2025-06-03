@@ -441,7 +441,7 @@ export const getHotPosts = async (start = 0, postNum = 5) => {
     const response = await axios.get(`${baseURL}/post/hot`, {
       params: {
         start,
-        PostNum: postNum
+        postNum: postNum
       },
       headers
     });
@@ -458,6 +458,48 @@ export const getHotPosts = async (start = 0, postNum = 5) => {
 }
 
 /**
+ * 获取朋友动态列表
+ * @param {Object} params 查询参数，包括页码、每页条数等
+ * @returns {Promise} 返回朋友动态列表和分页信息
+ */
+export const getFriendPosts = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.warn('未登录状态，无法获取朋友动态');
+      return {
+        code: 401,
+        message: '请先登录',
+        data: { list: [], total: 0, page: 1, size: 10, pages: 0 }
+      };
+    }
+    
+    const response = await axios.get(`${baseURL}/post/friend`, {
+      params: {
+        page: params.page || 1,
+        size: params.size || 10
+      },
+      headers: { token }
+    });
+    
+    console.log('获取朋友动态响应:', response.data);
+    
+    if (response.data.code === 200) {
+      return response.data;
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('获取朋友动态失败:', error);
+    return {
+      code: 500,
+      message: '获取朋友动态失败: ' + (error.message || '服务器内部错误'),
+      data: { list: [], total: 0, page: 1, size: 10, pages: 0 }
+    };
+  }
+};
+
+/**
  * 获取最新动态列表
  * @param {Number} start 起始位置，默认为0
  * @param {Number} postNum 获取条数，默认为15
@@ -471,7 +513,7 @@ export const getNewPosts = async (start = 0, postNum = 5) => {
     const response = await axios.get(`${baseURL}/post/new`, {
       params: {
         start,
-        PostNum: postNum
+        postNum: postNum
       },
       headers
     });
@@ -686,6 +728,35 @@ export const getPostsByIds = async (postIds) => {
     };
   } catch (error) {
     console.error('批量获取动态详情失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 获取当前用户点赞过的动态
+ * @returns {Promise} 返回用户点赞的动态列表
+ */
+export const getUserLikedPosts = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('用户未登录');
+    }
+    
+    // 调用API获取用户点赞过的动态ID列表
+    const response = await axios.get(`${baseURL}/post/liked`, {
+      headers: { token }
+    });
+    
+    if (response.data.code === 200) {
+      // 如果成功获取到点赞动态列表，处理并返回数据
+      const likedPosts = response.data.data;
+      return await getPostsByIds(likedPosts.map(post => post.postId || post.id));
+    } else {
+      throw new Error(response.data.message || '获取点赞动态列表失败');
+    }
+  } catch (error) {
+    console.error('获取用户点赞动态失败:', error);
     throw error;
   }
 }

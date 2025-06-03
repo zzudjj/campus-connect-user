@@ -91,15 +91,20 @@
               <div class="search-box">
                 <el-input
                   v-model="searchQuery"
-                  placeholder="搜索用户..."
+                  placeholder="搜索用户昵称..."
                   clearable
                   @input="handleSearch"
+                  @clear="handleSearch"
+                  @keyup.enter="handleSearch"
                 >
                   <template #prefix>
                     <el-icon><i-ep-search /></el-icon>
                   </template>
                 </el-input>
               </div>
+              <p class="no-results" v-if="isSearching && totalUsers === 0">
+                未找到符合 "{{ searchQuery }}" 的用户
+              </p>
             </div>
             
             <div v-if="loadingUsers" class="loading-container">
@@ -121,6 +126,20 @@
                 @add-friend="showAddFriendDialog"
                 @view-profile="viewUserProfile"
               />
+              
+              <!-- 分页器 -->
+              <div class="pagination-container" v-if="isSearching && totalPages > 1">
+                <el-pagination
+                  v-model:currentPage="currentPage"
+                  :page-size="pageSize.value"
+                  layout="prev, pager, next"
+                  :total="totalUsers"
+                  @current-change="handlePageChange"
+                  :pager-count="5"
+                  background
+                  hide-on-single-page
+                />
+              </div>
             </div>
           </el-tab-pane>
         </el-tabs>
@@ -200,6 +219,7 @@ import HeaderBar from '../components/layout/HeaderBar.vue';
 import FriendCard from '../components/friend/FriendCard.vue';
 import UserCard from '../components/friend/UserCard.vue';
 import RequestCard from '../components/friend/RequestCard.vue';
+import { debounce } from 'lodash';
 
 // 导入API
 import { 
@@ -213,7 +233,7 @@ import {
   checkFriendStatus, 
   sendFriendRequest as apiSendFriendRequest 
 } from '../api/friend.js';
-import { getAllUsers, getUserPublicProfile } from '../api/user.js';
+import { getNonFriendUsers, getUserPublicProfile, searchUsersByNickname } from '../api/user.js';
 
 const router = useRouter();
 
@@ -235,8 +255,15 @@ const pendingRequestCount = ref(0);
 
 // 全部用户相关
 const users = ref([]);
-const loadingUsers = ref(true);
+const loadingUsers = ref(false);
 const searchQuery = ref('');
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalUsers = ref(0);
+const totalPages = ref(1);
+const isSearching = ref(false);
+const searchError = ref('');
+
 const addFriendDialogVisible = ref(false);
 const currentUser = ref(null);
 const requestMessage = ref('');
@@ -455,11 +482,46 @@ const fetchUsers = async () => {
     // 在获取用户列表前检查登录状态
     const loginStatus = checkLoginStatus();
     
-    const data = await getAllUsers();
+    let data;
+    
+    // 如果有搜索关键词，使用searchUsersByNickname API，否则获取非好友用户
+    if (searchQuery.value.trim()) {
+      isSearching.value = true;
+      data = await searchUsersByNickname(searchQuery.value, currentPage.value, pageSize.value);
+    } else {
+      isSearching.value = false;
+      // 使用新的API获取非好友用户列表
+      data = await getNonFriendUsers(currentPage.value, pageSize.value);
+    }
+    
     if (data.code === 200) {
-      console.group('过滤用户列表');
-      // 获取原始数据信息
-      console.log('原始用户数据总数:', data.data.length);
+      console.group('处理用户列表');
+      // 获取数据信息
+      if (isSearching.value || !Array.isArray(data.data)) {
+        // 兼容不同分页字段
+        // 判断是否使用分页形式的API返回
+        if (data.data.list) {
+          const total = data.data.total || 0;
+          const pages = data.data.pages || 1;
+          
+          console.log('用户列表结果:', { 总数: total, 总页数: pages });
+          
+          totalUsers.value = total;
+          totalPages.value = pages;
+        } else if (data.data.totalCount) {
+          // 兼容旧的格式
+          totalUsers.value = data.data.totalCount;
+          totalPages.value = data.data.totalPages || 1;
+        } else {
+          // 无分页信息
+          totalUsers.value = 0;
+          totalPages.value = 1;
+        }
+      } else {
+        console.log('用户数据总数:', data.data.length);
+        totalUsers.value = data.data.length;
+        totalPages.value = 1;
+      }
       console.log('浏览器类型:', navigator.userAgent.indexOf('Edg') > -1 ? 'Edge' : 'Chrome/其他');
       
       // 获取当前用户ID值 - 从 userInfo 对象中提取
@@ -485,53 +547,39 @@ const fetchUsers = async () => {
       
       console.log('最终的当前用户ID值:', currentUserId, '类型:', typeof currentUserId);
       
-      // 改进过滤逻辑，处理跨浏览器问题
-      let filteredList = [];
+      // 处理数据列表
+      let userList;
       
-      // 检查是否在Edge浏览器中运行
-      const isEdgeBrowser = navigator.userAgent.indexOf('Edg') > -1;
-      
-      if (isEdgeBrowser) {
-        // Edge浏览器中特殊处理
-        console.log('Edge浏览器特殊处理');
-        // 仅当userId类型为string时才过滤，否则显示全部
-        if (currentUserId && typeof currentUserId === 'string' && currentUserId.trim() !== '') {
-          console.log('在Edge中有效的userId，进行过滤');
-          filteredList = data.data.filter(user => {
-            if (!user.userId) return true;
-            return String(user.userId) !== String(currentUserId);
-          });
-        } else {
-          console.log('Edge中无效userId，显示全部用户');
-          filteredList = data.data;
-        }
+      // 兼容不同的API返回结构
+      if (data.data.list) {
+        // 非好友用户和搜索用户API都返回 list 字段
+        userList = data.data.list;
+        console.log('使用data.data.list数据结构');
+      } else if (data.data.users) {
+        userList = data.data.users;
+        console.log('使用data.data.users数据结构');
+      } else if (Array.isArray(data.data)) {
+        // 兼容旧的getAllUsers返回数组的情况
+        userList = data.data;
+        console.log('使用data.data数组');
       } else {
-        // Chrome和其他浏览器中的处理
-        console.log('Chrome/其他浏览器处理');
-        if (currentUserId && typeof currentUserId === 'string' && currentUserId.trim() !== '') {
-          console.log('其他浏览器有效userId，进行过滤');
-          filteredList = data.data.filter(user => {
-            if (!user.userId) return true;
-            const userId = String(user.userId);
-            const currId = String(currentUserId);
-            const shouldExclude = userId === currId;
-            if (shouldExclude) {
-              console.log(`排除用户: ${userId} === ${currId}`);
-            }
-            return !shouldExclude;
-          });
-        } else {
-          console.log('其他浏览器无效userId，显示全部用户');
-          filteredList = data.data;
-        }
+        console.warn('用户列表数据结构异常！', data.data);
+        userList = [];
       }
+      
+      // 输出完整的数据结构以便调试
+      console.log('用户列表完整结构:', data);
+      console.log('处理后的用户列表:', userList);
+      
+      // 使用非好友API时不需要再过滤当前用户，API已经帮我们过滤了
+      let filteredList = userList;
       
       console.log('过滤后用户数据总数:', filteredList.length);
       console.groupEnd();
       
       // 重新映射字段以适应现有组件
       const mappedUsers = filteredList.map(user => ({
-        id: user.userId,
+        id: user.userId || user.id, // 兼容不同API的返回格式
         nickname: user.nickname,
         avatarUrl: user.avatarUrl,
         department: user.department,
@@ -578,20 +626,7 @@ const checkFriendRelationship = async (userList) => {
 
 // 过滤用户列表
 const filteredUsers = computed(() => {
-  if (!searchQuery.value) {
-    return users.value;
-  }
-  
-  const query = searchQuery.value.toLowerCase();
-  return users.value.filter(user => {
-    const nickname = (user.nickname || '').toLowerCase();
-    const school = (user.school || '').toLowerCase();
-    const department = (user.department || '').toLowerCase();
-    
-    return nickname.includes(query) || 
-           school.includes(query) || 
-           department.includes(query);
-  });
+  return users.value;
 });
 
 // 显示添加好友对话框
@@ -669,9 +704,18 @@ const viewUserProfile = (userId) => {
   router.push(`/user/${userId}`);
 };
 
-// 搜索处理
-const handleSearch = () => {
-  // 防抖可以在这里实现
+// 搜索处理 - 使用debounce防抖，300ms延迟
+const handleSearch = debounce(async () => {
+  // 搜索时重置页码和错误状态
+  currentPage.value = 1;
+  searchError.value = '';
+  await fetchUsers();
+}, 300);
+
+// 分页处理
+const handlePageChange = async (page) => {
+  currentPage.value = page;
+  await fetchUsers();
 };
 
 // 标签页切换

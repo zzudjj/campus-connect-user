@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import MainPage from '../views/MainPage.vue';
 import FeedPage from '../views/FeedPage.vue';
 import UserProfile from '../views/UserProfile.vue';
+import UserEditProfile from '../views/UserEditProfile.vue';
 import FriendsPage from '../views/FriendsPage.vue';
 import ChatPage from '../views/ChatPage.vue';
 import VerificationPage from '../views/VerificationPage.vue';
@@ -48,6 +49,13 @@ const routes = [
     path: '/verification',
     name: 'Verification',
     component: VerificationPage
+  },
+  // 编辑个人资料页面
+  {
+    path: '/profile/edit',
+    name: 'UserEditProfile',
+    component: UserEditProfile,
+    meta: { requiresAuth: true }
   }
 ];
 
