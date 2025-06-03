@@ -100,18 +100,7 @@
         <span class="count-text">{{ post.commentCount }}</span>
       </div>
       
-      <div class="action-item follow-btn">
-        <el-button
-          class="action-btn"
-          :type="post.isFollowed ? 'primary' : 'default'"
-          size="small"
-          text
-          @click="$emit('follow', post.userId)"
-        >
-          <i class="fas fa-user-plus"></i>
-          <span>{{ post.isFollowed ? '已关注' : '关注' }}</span>
-        </el-button>
-      </div>
+      <!-- 关注按钮已移除 -->
     </div>
   </el-card>
   

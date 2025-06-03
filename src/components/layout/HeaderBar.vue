@@ -2,7 +2,17 @@
   <header class="main-header">
     <div class="header-inner">
       <div v-if="centerSearch" class="header-search header-search-center">
-        <el-input placeholder="搜索校园动态/用户..." prefix-icon="el-icon-search" class="search-input" />
+        <el-input 
+          v-model="searchKeyword" 
+          placeholder="搜索校园动态/用户..." 
+          @keyup.enter="handleSearch"
+          clearable
+          @clear="clearSearch"
+          class="search-input">
+          <template #prefix>
+            <el-icon class="search-icon"><i-ep-search /></el-icon>
+          </template>
+        </el-input>
       </div>
       <div v-else class="header-search"></div>
       
@@ -51,6 +61,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '../../stores/user';
 import AuthModal from '../modals/AuthModal.vue';
+import { ElMessage } from 'element-plus';
 
 const props = defineProps({
   centerSearch: Boolean
@@ -59,6 +70,42 @@ const props = defineProps({
 const router = useRouter();
 const userStore = useUserStore();
 const showAuthModal = ref(false);
+const searchKeyword = ref('');
+
+// 处理搜索
+const handleSearch = () => {
+  if (!searchKeyword.value.trim()) {
+    return ElMessage({
+      message: '请输入搜索内容',
+      type: 'warning'
+    });
+  }
+  
+  const searchTerm = searchKeyword.value.trim();
+  
+  // 判断当前是否已经在Feed页面
+  if (router.currentRoute.value.path === '/' || router.currentRoute.value.name === 'Feed') {
+    // 如果已经在Feed页面，只更新查询参数而不重新加载页面
+    router.replace({
+      query: { search: searchTerm }
+    });
+  } else {
+    // 如果不在Feed页面，才进行跳转
+    router.push({
+      path: '/',
+      query: { search: searchTerm }
+    });
+  }
+};
+
+// 清空搜索
+const clearSearch = () => {
+  searchKeyword.value = '';
+  // 如果当前在Feed页面并且有search参数，则清除参数
+  if (router.currentRoute.value.path === '/feed' && router.currentRoute.value.query.search) {
+    router.replace({ path: '/feed' });
+  }
+};
 
 // 处理下拉菜单选项
 const handleCommand = (command) => {

@@ -1,7 +1,6 @@
 <template>
   <aside class="main-sidebar">
     <div class="sidebar-header">
-      <img class="logo-img" src="/logo.png" alt="logo" />
       <span class="site-title">校园社交平台</span>
     </div>
     <nav class="sidebar-nav">

@@ -1,7 +1,8 @@
 <template>
   <div class="feed-page-container">
     <!-- 模式切换器 -->
-    <div class="feed-mode-switcher">
+    <!-- 模式切换器，搜索模式下隐藏 -->
+    <div v-if="mode !== 'search'" class="feed-mode-switcher">
       <div class="tabs-container">
         <div 
           class="mode-tab" 
@@ -25,6 +26,22 @@
           好友
         </div>
         <div class="active-tab-indicator" :class="mode"></div>
+      </div>
+    </div>
+    
+    <!-- 搜索模式标题 -->
+    <div v-if="mode === 'search'" class="search-header">
+      <div class="search-title">
+        <div class="search-keyword">"{{ searchKeyword }}" 的搜索结果</div>
+        <el-button 
+          type="primary" 
+          size="small" 
+          @click="clearSearch"
+          class="return-button"
+        >
+          <i class="el-icon-back"></i>
+          返回首页
+        </el-button>
       </div>
     </div>
     
@@ -94,6 +111,8 @@
 import { ref, onMounted, onBeforeUnmount, watch, defineEmits, inject, nextTick, computed } from 'vue';
 import { getHotPosts, getNewPosts, getPostsByIds, getFriendPosts } from '../api/post';
 import { toggleLike, getLikeStatus } from '@/api/like';
+import { searchPosts } from '@/api/search';
+import { useRoute, useRouter } from 'vue-router';
 import PostItem from '../components/post/PostItem.vue';
 import PostModal from '../components/modals/PostModal.vue';
 import { ElMessage } from 'element-plus';
@@ -117,8 +136,13 @@ const hasMore = ref(true); // 是否还有更多数据
 const pageSize = 15; // 每页数量，与API文档默认值保持一致
 const currentStart = ref(0); // 当前起始位置
 
+// 路由相关
+const route = useRoute();
+const router = useRouter();
+
 // 模式切换
 const mode = ref('hot'); // 默认为热门模式
+const searchKeyword = ref('');
 const loadMoreTrigger = ref(null); // 加载更多的触发元素引用
 const isTabSwitching = ref(false); // 记录是否正在切换标签
 
@@ -132,37 +156,52 @@ watch(initialLoading, (newValue) => {
   emit('loading-changed', newValue);
 });
 
+
+
 // 切换热门/最新模式
-const switchMode = async (newMode) => {
+const switchMode = (newMode) => {
   if (mode.value === newMode) return;
   
-  // 先标记模式切换中，让CSS动画生效
+  console.log(`切换到${newMode}模式`);
   isTabSwitching.value = true;
-  const previousMode = mode.value;
-  mode.value = newMode; // 立即切换模式，触发CSS动画
+  mode.value = newMode;
+  posts.value = [];
+  hasMore.value = true;
+  currentStart.value = 0;
   
-  // 延迟加载数据，等动画完成
-  setTimeout(async () => {
-    try {
-      // 显示加载状态，但不是全屏加载
-      loadingMore.value = true;
-      
-      // 重置分页参数
-      currentStart.value = 0;
-      hasMore.value = true;
-      
-      // 先清空内容，再加载新数据
-      posts.value = [];
-      await loadPosts();
-    } catch (error) {
-      console.error('切换模式失败:', error);
-      mode.value = previousMode; // 恢复原模式
-      ElMessage.error('切换模式失败，请重试');
-    } finally {
-      loadingMore.value = false;
-      isTabSwitching.value = false;
-    }
-  }, 250); // 等待250毫秒，让动画有足够时间完成
+  // 如果从搜索模式切换回来，清除搜索关键词和URL参数
+  if (searchKeyword.value) {
+    searchKeyword.value = '';
+    router.replace({ query: {} });
+  }
+  
+  loadPosts().finally(() => {
+    isTabSwitching.value = false;
+  });
+};
+
+// 处理搜索
+const handleSearch = (keyword) => {
+  if (!keyword || keyword.trim() === '') return;
+  
+  console.log(`搜索关键词: ${keyword}`);
+  searchKeyword.value = keyword;
+  mode.value = 'search';
+  posts.value = [];
+  hasMore.value = true;
+  currentStart.value = 0;
+  
+  // 更新URL参数以便分享和刷新后保持搜索状态
+  router.replace({ query: { search: keyword } });
+  
+  loadPosts();
+};
+
+// 清除搜索
+const clearSearch = () => {
+  searchKeyword.value = '';
+  router.replace({ query: {} });
+  switchMode('hot');
 };
 
 // 刷新帖子列表
@@ -334,6 +373,72 @@ const loadPosts = async () => {
         loadingMore.value = false;
         console.groupEnd();
         return;
+      }
+    }
+    // 如果是搜索模式，获取搜索结果
+    else if (mode.value === 'search' && searchKeyword.value) {
+      console.log('搜索动态...', searchKeyword.value);
+      postsResult = await searchPosts(searchKeyword.value, currentStart.value + 1, pageSize);
+      
+      if (postsResult.code === 200) {
+        console.log('搜索结果获取成功:', postsResult.data);
+        
+        // 处理搜索结果
+        if (postsResult.data && postsResult.data.posts) {
+          postsList = postsResult.data.posts;
+          
+          // 检查是否还有更多数据
+          const totalPages = postsResult.data.totalPages || 0;
+          const currentPage = postsResult.data.currentPage || 0;
+          
+          if (currentPage >= totalPages || postsList.length === 0) {
+            console.log('没有更多搜索结果');
+            hasMore.value = false;
+          }
+          
+          // 如果搜索结果为空，显示提示
+          if (postsList.length === 0 && currentStart.value === 0) {
+            ElMessage.info(`没有找到与"${searchKeyword.value}"相关的内容`);
+          }
+          
+          // 处理每个动态的数据
+          for (let i = 0; i < postsList.length; i++) {
+            const post = postsList[i];
+            // 确保字段名称一致
+            post.id = post.id || post.postId;
+            post.likeCount = post.likeNum || post.likeCount || 0;
+            post.commentCount = post.commentNum || post.commentCount || 0;
+            
+            // 确保媒体字段存在
+            if (!post.media) {
+              post.media = [];
+            }
+          }
+          
+          // 获取每个动态的点赞状态
+          const likeStatusPromises = postsList.map(async (post) => {
+            const postId = post.id || post.postId;
+            try {
+              const likeStatus = await fetchPostLikeStatus(postId);
+              post.isLiked = likeStatus.isLiked;
+              post.likeCount = likeStatus.likeCount || post.likeCount;
+            } catch (error) {
+              console.error(`获取搜索结果 ${postId} 的点赞状态失败:`, error);
+            }
+          });
+          
+          // 等待所有点赞状态获取完成
+          await Promise.all(likeStatusPromises);
+          
+          // 更新搜索结果列表
+          posts.value = [...posts.value, ...postsList];
+          currentStart.value++;
+          loadingMore.value = false;
+          console.groupEnd();
+          return;
+        }
+      } else {
+        throw new Error(postsResult.message || '搜索失败');
       }
     }
     
@@ -530,6 +635,14 @@ const setupInfiniteScroll = () => {
 };
 
 onMounted(() => {
+  // 初始化时检查URL参数中是否包含搜索关键词
+  const searchParam = route.query.search;
+  if (searchParam) {
+    console.log(`从URL参数加载搜索: ${searchParam}`);
+    searchKeyword.value = searchParam;
+    mode.value = 'search';
+  }
+  
   // 初始加载数据
   loadPosts();
   
@@ -540,6 +653,24 @@ onMounted(() => {
   
   // 添加自定义事件监听器
   document.addEventListener('refresh-feed-list', handleRefreshFeedList);
+  
+  // 监听路由参数变化，处理搜索功能
+  watch(() => route.query.search, (newSearch) => {
+    if (newSearch) {
+      if (searchKeyword.value !== newSearch) {
+        console.log('检测到搜索参数变化:', newSearch);
+        searchKeyword.value = newSearch;
+        mode.value = 'search';
+        posts.value = [];
+        hasMore.value = true;
+        currentStart.value = 0;
+        loadPosts();
+      }
+    } else if (mode.value === 'search') {
+      // 如果在搜索模式下搜索参数被清除，则切换回热门模式
+      switchMode('hot');
+    }
+  });
 });
 
 onBeforeUnmount(() => {
@@ -726,6 +857,43 @@ onBeforeUnmount(() => {
   font-size: 14px;
   margin: 30px 0;
   gap: 12px;
+}
+
+/* 搜索结果页面样式 */
+.search-header {
+  background-color: #f5f5f7;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.search-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.search-keyword {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.return-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #409eff;
+  transition: all 0.3s ease;
+}
+
+.return-button:hover {
+  background-color: #66b1ff;
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.2);
 }
 
 .divider {
