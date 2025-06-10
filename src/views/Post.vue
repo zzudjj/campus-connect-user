@@ -13,6 +13,15 @@
       <el-form>
         <el-form-item>
           <el-input
+            v-model="postTitle"
+            placeholder="标题(必填)"
+            maxlength="50"
+            show-word-limit
+            class="title-input"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-input
             v-model="postContent"
             type="textarea"
             :rows="6"
@@ -70,12 +79,13 @@ import { ElMessage } from 'element-plus';
 import { Plus, Location, CollectionTag, User, Headset } from '@element-plus/icons-vue';
 
 const router = useRouter();
+const postTitle = ref('');
 const postContent = ref('');
 const imageList = ref([]);
 const publishing = ref(false);
 
 const canPublish = computed(() => {
-  return postContent.value.trim().length > 0 || imageList.value.length > 0;
+  return postTitle.value.trim().length > 0 && (postContent.value.trim().length > 0 || imageList.value.length > 0);
 });
 
 const goBack = () => {
@@ -96,12 +106,15 @@ const handlePublish = async () => {
   try {
     // 实际项目应先上传图片，简化处理
     const res = await createPost({
+      title: postTitle.value,
       content: postContent.value,
+      visibility: 0, // 默认公开
       images: imageList.value.map(f => f.url || f.response?.url || '')
     });
     ElMessage.success('发布成功');
     router.push('/home');
   } catch (error) {
+    console.error('发布失败:', error);
     ElMessage.error('发布失败，请稍后再试');
   } finally {
     publishing.value = false;
@@ -130,6 +143,12 @@ const handlePublish = async () => {
   flex: 1;
   padding: 24px 18px 0 18px;
   overflow-y: auto;
+}
+
+.title-input {
+  margin-bottom: 12px;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.04);
 }
 
 .content-input {

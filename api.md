@@ -918,7 +918,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 | 参数名 | 类型 | 必填 | 描述 |
 | ------ | ---- | ---- | ---- |
 | start | Integer | 否 | 起始位置，默认为0 |
-| PostNum | Integer | 否 | 获取条数，默认为15 |
+| PostNum | Integer | 否 | 获取条数，默认为5 |
 
 **响应示例**:
 
@@ -946,7 +946,7 @@ Campus Connect API 是一个面向校园社交平台的RESTful API接口。所�
 | 参数名 | 类型 | 必填 | 描述 |
 | ------ | ---- | ---- | ---- |
 | start | Integer | 否 | 起始位置，默认为0 |
-| PostNum | Integer | 否 | 获取条数，默认为15 |
+| PostNum | Integer | 否 | 获取条数，默认为5 |
 
 **响应示例**:
 

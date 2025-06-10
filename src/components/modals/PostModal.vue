@@ -24,6 +24,17 @@
           <span class="username">{{ username }}</span>
         </div>
         
+        <!-- 标题输入框 -->
+        <div class="title-input">
+          <input 
+            type="text"
+            v-model="postTitle" 
+            placeholder="请输入标题(必填)" 
+            maxlength="50"
+          />
+          <div class="word-count">{{ postTitle.length }}/50</div>
+        </div>
+        
         <!-- 内容输入框 -->
         <div class="content-input">
           <textarea 
@@ -181,8 +192,10 @@ const userStore = useUserStore();
 const userAvatar = computed(() => userStore.userInfo?.avatarUrl || '');
 const username = computed(() => userStore.userInfo?.nickname || '用户');
 
-// 发布内容
+// 动态标题、内容和发布状态
+const postTitle = ref('');
 const postContent = ref('');
+const isPublishing = ref(false);
 const images = ref([]);
 const videos = ref([]);
 const imageInput = ref(null);
@@ -200,13 +213,14 @@ const showVisibilityDropdown = ref(false);
 const hasImages = computed(() => images.value.length > 0);
 const hasVideo = computed(() => videos.value.length > 0);
 
-// 是否可以发布 - 需要至少有内容/媒体文件，并且至少选择一个标签
+// 是否可以发布 - 需要标题、至少有内容/媒体文件，并且至少选择一个标签
 const canPublish = computed(() => {
+  const hasTitle = postTitle.value.trim().length > 0;
   const hasContent = postContent.value.trim().length > 0;
   const hasMedia = hasImages.value || hasVideo.value;
   const hasSelectedTags = selectedTags.value.length > 0;
   
-  return (hasContent || hasMedia) && hasSelectedTags;
+  return hasTitle && (hasContent || hasMedia) && hasSelectedTags;
 });
 
 // 标签相关变量
@@ -422,6 +436,7 @@ const publishPost = async () => {
   }
   
   // 收集发布数据
+  const title = postTitle.value;
   const content = postContent.value;
   const visibility = selectedVisibility.value;
   const imagesList = [...images.value];
@@ -442,6 +457,7 @@ const publishPost = async () => {
   try {
     // 步骤1：创建动态
     const createResponse = await createPost({
+      title: title,
       content: content,
       visibility: visibility
     });
@@ -629,6 +645,29 @@ const closeModal = () => {
 
 .username {
   font-weight: 500;
+}
+
+/* 标题输入框 */
+.title-input {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.title-input input {
+  width: 100%;
+  border: none;
+  padding: 8px 0;
+  font-size: 16px;
+  font-weight: 500;
+  outline: none;
+}
+
+.title-input .word-count {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  font-size: 12px;
+  color: #999;
 }
 
 /* 内容输入框 */

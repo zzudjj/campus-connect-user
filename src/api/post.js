@@ -433,15 +433,15 @@ export const getTopHotBrief = async () => {
  * @param {Number} postNum 获取条数，默认为15
  * @returns {Promise} 返回热门动态ID列表
  */
-export const getHotPosts = async (start = 0, postNum = 5) => {
+export const getHotPosts = async (page = 1, postNum = 5) => {
   try {
     const token = localStorage.getItem('token');
     const headers = token ? { 'token': token } : {};
     
     const response = await axios.get(`${baseURL}/post/hot`, {
       params: {
-        start,
-        postNum: postNum
+        page,
+        size: postNum
       },
       headers
     });
@@ -505,15 +505,15 @@ export const getFriendPosts = async (params = {}) => {
  * @param {Number} postNum 获取条数，默认为15
  * @returns {Promise} 返回最新动态ID列表
  */
-export const getNewPosts = async (start = 0, postNum = 5) => {
+export const getNewPosts = async (page = 0, postNum = 5) => {
   try {
     const token = localStorage.getItem('token');
     const headers = token ? { 'token': token } : {};
     
     const response = await axios.get(`${baseURL}/post/new`, {
       params: {
-        start,
-        postNum: postNum
+        page,
+        size: postNum
       },
       headers
     });
